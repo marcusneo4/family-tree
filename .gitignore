@@ -34,3 +34,31 @@ desktop.ini
 *.tmp
 *.temp
 
+# Environment / secrets
+.env
+.env.*
+.env.local
+.env.production
+.env.development
+.env.test
+
+# Build artifacts
+dist/
+build/
+coverage/
+.next/
+.parcel-cache/
+.turbo/
+
+# Archives / dumps
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+
+# IDE backups
+.vs/
+.fleet/
+.DS_Store
+
