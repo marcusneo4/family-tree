@@ -172,6 +172,14 @@ body.dark-mode .title-cn {
     border-right: 1px solid var(--border-color);
 }
 
+.quiz-btn {
+    display: none;
+}
+
+.quiz-btn.is-visible {
+    display: flex;
+}
+
 .control-btn {
     width: 44px;
     height: 44px;
@@ -445,6 +453,30 @@ body.dark-mode .title-cn {
     transform: translateY(-8px) scale(1.02);
     box-shadow: var(--shadow-xl);
     border-color: var(--primary-color);
+}
+
+.quiz-status {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    z-index: 14;
+}
+
+.quiz-correct {
+    background: #10b981;
+}
+
+.quiz-wrong {
+    background: #ef4444;
 }
 
 .passed-on-indicator {

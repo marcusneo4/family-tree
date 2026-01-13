@@ -169,6 +169,9 @@ let selectedPersonId = null;
 let bloodlineOnlyFilterEnabled = false;
 let bloodlineIdSet = new Set();
 let currentSearchQuery = '';
+// Quiz mode state (kept in-memory, not persisted)
+let quizAssignments = {}; // personId -> photoPath
+let quizResults = {};     // personId -> boolean correct
 const VIEW_MODES = {
     DISCREET: 'discreet',
     FILLED: 'filled',
@@ -293,6 +296,51 @@ document.addEventListener('DOMContentLoaded', function() {
     showToast('Welcome to your Family Tree!', 'success');
 });
 
+function resetQuizState() {
+    quizAssignments = {};
+    quizResults = {};
+}
+
+function updateQuizButtonVisibility() {
+    const quizCheckBtn = document.getElementById('quizCheckBtn');
+    if (!quizCheckBtn) return;
+    const shouldShow = currentViewMode === VIEW_MODES.QUIZ;
+    quizCheckBtn.classList.toggle('is-visible', shouldShow);
+}
+
+function evaluateQuizAnswers() {
+    const assignmentIds = Object.keys(quizAssignments);
+    if (assignmentIds.length === 0) {
+        showToast('No photos placed yet. Drag photos onto the cards first.', 'warning');
+        return;
+    }
+
+    const results = {};
+    let correctCount = 0;
+
+    assignmentIds.forEach(idStr => {
+        const personId = parseInt(idStr);
+        const person = findPersonById(personId);
+        if (!person) return;
+
+        const guessPath = quizAssignments[personId];
+        const filename = guessPath ? decodeURIComponent(guessPath.split('/').pop() || '') : '';
+        const guessKey = normalizeNameForMatch(filename);
+        const targetKey = normalizeNameForMatch(person.name);
+        const isCorrect = guessKey && targetKey && guessKey === targetKey;
+
+        results[personId] = isCorrect;
+        if (isCorrect) correctCount++;
+    });
+
+    quizResults = results;
+    renderTree();
+
+    const total = assignmentIds.length;
+    const message = `${correctCount}/${total} correct. Green = correct, red = wrong.`;
+    showToast(message, correctCount === total ? 'success' : 'info');
+}
+
 // Setup Event Listeners
 function setupEventListeners() {
     const modal = document.getElementById('memberModal');
@@ -317,6 +365,7 @@ function setupEventListeners() {
     const modeDiscreetBtn = document.getElementById('modeDiscreetBtn');
     const modeFilledBtn = document.getElementById('modeFilledBtn');
     const modeQuizBtn = document.getElementById('modeQuizBtn');
+    const quizCheckBtn = document.getElementById('quizCheckBtn');
 
     closeBtn.onclick = () => closeModal();
     cancelBtn.onclick = () => closeModal();
@@ -472,6 +521,12 @@ function setupEventListeners() {
         };
     }
 
+    if (quizCheckBtn) {
+        quizCheckBtn.onclick = () => {
+            evaluateQuizAnswers();
+        };
+    }
+
     // Close export menu when clicking outside
     document.addEventListener('click', (e) => {
         if (!e.target.closest('#exportBtn') && !e.target.closest('#exportMenu')) {
@@ -608,6 +663,13 @@ function setViewMode(mode, options = {}) {
     if (!Object.values(VIEW_MODES).includes(mode)) return;
     currentViewMode = mode;
     applyModeButtonState();
+    updateQuizButtonVisibility();
+    if (mode !== VIEW_MODES.QUIZ) {
+        resetQuizState();
+    } else {
+        // Fresh quiz session whenever entering quiz mode
+        resetQuizState();
+    }
     
     // Hide/show gallery section based on mode
     const gallerySection = document.querySelector('.photo-gallery');
@@ -786,6 +848,9 @@ function renderTree() {
                 setupDropZone(placeholder, personId);
             }
             
+            // Add drop zone to the entire card as a fallback (important for quiz mode)
+            setupDropZone(card, personId);
+            
             // Click on card (but not edit button) opens profile sidebar
             card.addEventListener('click', function(e) {
                 if (!e.target.closest('.edit-btn')) {
@@ -893,8 +958,13 @@ function getRelationshipLabel(status) {
 }
 
 function shouldShowPhotoOnTree(person) {
-    if (!person || !person.photo) return false;
-    return currentViewMode === VIEW_MODES.FILLED;
+    if (!person) return false;
+    // In quiz mode, show the guessed photo (if any)
+    if (currentViewMode === VIEW_MODES.QUIZ) {
+        return !!quizAssignments[person.id];
+    }
+    // In filled mode, show stored photo
+    return currentViewMode === VIEW_MODES.FILLED && !!person.photo;
 }
 
 function renderPersonCard(person) {
@@ -919,9 +989,11 @@ function renderPersonCard(person) {
         ? `<div class="bloodline-badge" title="Main bloodline (Soon)"><span>孙</span></div>`
         : '';
     
+    const quizGuessPhoto = quizAssignments[person.id];
     const showPhoto = shouldShowPhotoOnTree(person);
-    const photoHtml = showPhoto
-        ? `<img src="${person.photo}" alt="${person.name}" class="person-photo">`
+    const photoSrc = currentViewMode === VIEW_MODES.QUIZ ? quizGuessPhoto : person.photo;
+    const photoHtml = showPhoto && photoSrc
+        ? `<img src="${photoSrc}" alt="${person.name}" class="person-photo">`
         : `<div class="person-placeholder ${genderClass} ${generationClass}">${initials}</div>`;
     
     // Count children
@@ -984,11 +1056,20 @@ function renderPersonCard(person) {
         ageDisplay = `${age} years`;
     }
     
+    // Quiz status badge
+    const hasQuizResult = currentViewMode === VIEW_MODES.QUIZ && (person.id in quizResults);
+    const quizStatus = hasQuizResult
+        ? `<div class="quiz-status ${quizResults[person.id] ? 'quiz-correct' : 'quiz-wrong'}">
+                <i class="fas ${quizResults[person.id] ? 'fa-check' : 'fa-times'}"></i>
+           </div>`
+        : '';
+
     return `
         <div class="person-card" data-person-id="${person.id}" data-is-bloodline="${isBloodline ? '1' : '0'}">
             ${passedOnBadge}
             ${genderBadge}
             ${bloodlineBadge}
+            ${quizStatus}
             <button class="edit-btn"><i class="fas fa-pencil-alt"></i></button>
             ${photoHtml}
             <div class="person-name">${person.name}</div>
@@ -1560,8 +1641,21 @@ function setupDropZone(element, personId) {
 function handlePhotoDrop(personId, photoPath) {
     const person = findPersonById(personId);
     if (!person) return;
+
+    if (currentViewMode === VIEW_MODES.QUIZ) {
+        // Do not persist; store guess in-memory
+        quizAssignments[personId] = photoPath;
+        // Clear prior result for this person (they're trying again)
+        if (quizResults[personId] !== undefined) {
+            delete quizResults[personId];
+        }
+        renderTree();
+        renderPhotoGallery();
+        showToast(`Guess saved for ${person.name}.`, 'info');
+        return;
+    }
     
-    // Update person's photo
+    // Update person's photo (normal modes)
     person.photo = photoPath;
     
     // Save data
