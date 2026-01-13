@@ -165,6 +165,10 @@ let panX = 0;
 let panY = 0;
 let isPanning = false;
 let lastPanPoint = { x: 0, y: 0 };
+let isPinching = false;
+let pinchStartDistance = 0;
+let pinchStartZoom = 1;
+let pinchStartMidpoint = { x: 0, y: 0 };
 let selectedPersonId = null;
 let bloodlineOnlyFilterEnabled = false;
 let bloodlineIdSet = new Set();
@@ -546,14 +550,33 @@ function setupEventListeners() {
 function setupPanAndZoom() {
     const treeWrapper = document.getElementById('treeWrapper');
     const treeContainer = document.getElementById('treeContainer');
+    const clampZoom = (value) => Math.max(0.3, Math.min(3, value));
+    const shouldIgnorePanStart = (target) => (
+        target.closest('.person-card') ||
+        target.closest('.control-btn') ||
+        target.closest('#profileSidebar') ||
+        target.closest('.profile-sidebar')
+    );
+
+    const getTouchDistance = (e) => {
+        if (e.touches.length < 2) return 0;
+        const [a, b] = [e.touches[0], e.touches[1]];
+        return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+    };
+
+    const getTouchMidpoint = (e) => {
+        if (e.touches.length < 2) return { x: 0, y: 0 };
+        const [a, b] = [e.touches[0], e.touches[1]];
+        return {
+            x: (a.clientX + b.clientX) / 2,
+            y: (a.clientY + b.clientY) / 2
+        };
+    };
 
     // Pan handlers
     treeWrapper.addEventListener('mousedown', (e) => {
         // Don't start panning if clicking on a person card or its children
-        if (e.target.closest('.person-card') || 
-            e.target.closest('.control-btn') || 
-            e.target.closest('#profileSidebar') ||
-            e.target.closest('.profile-sidebar')) {
+        if (shouldIgnorePanStart(e.target)) {
             return;
         }
 
@@ -620,9 +643,85 @@ function setupPanAndZoom() {
         panX = mouseX - zoomPointX * newZoom;
         panY = mouseY - zoomPointY * newZoom;
 
-        currentZoom = newZoom;
+        currentZoom = clampZoom(newZoom);
         applyTransform();
     });
+
+    // Touch support for pan + pinch zoom
+    treeWrapper.addEventListener('touchstart', (e) => {
+        if (shouldIgnorePanStart(e.target)) return;
+
+        if (e.touches.length === 1) {
+            isPanning = true;
+            treeWrapper.classList.add('panning');
+            lastPanPoint.x = e.touches[0].clientX;
+            lastPanPoint.y = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+            isPinching = true;
+            pinchStartDistance = getTouchDistance(e);
+            pinchStartZoom = currentZoom;
+            pinchStartMidpoint = getTouchMidpoint(e);
+        }
+    }, { passive: false });
+
+    const handleTouchMove = (e) => {
+        // Pinch to zoom
+        if (isPinching && e.touches.length >= 2) {
+            e.preventDefault();
+            const newDistance = getTouchDistance(e);
+            if (pinchStartDistance > 0) {
+                const scale = newDistance / pinchStartDistance;
+                const newZoom = clampZoom(pinchStartZoom * scale);
+
+                const rect = treeWrapper.getBoundingClientRect();
+                const pinchPoint = {
+                    x: pinchStartMidpoint.x - rect.left,
+                    y: pinchStartMidpoint.y - rect.top
+                };
+                const zoomPointX = (pinchPoint.x - panX) / currentZoom;
+                const zoomPointY = (pinchPoint.y - panY) / currentZoom;
+
+                panX = pinchPoint.x - zoomPointX * newZoom;
+                panY = pinchPoint.y - zoomPointY * newZoom;
+
+                currentZoom = newZoom;
+                applyTransform();
+            }
+            return;
+        }
+
+        // One-finger pan
+        if (isPanning && e.touches.length === 1) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - lastPanPoint.x;
+            const deltaY = touch.clientY - lastPanPoint.y;
+
+            panX += deltaX;
+            panY += deltaY;
+
+            lastPanPoint.x = touch.clientX;
+            lastPanPoint.y = touch.clientY;
+
+            applyTransform();
+        }
+    };
+
+    treeWrapper.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+    const handleTouchEnd = (e) => {
+        if (e.touches.length === 0) {
+            isPanning = false;
+            treeWrapper.classList.remove('panning');
+        }
+        if (e.touches.length < 2) {
+            isPinching = false;
+            pinchStartDistance = 0;
+        }
+    };
+
+    treeWrapper.addEventListener('touchend', handleTouchEnd);
+    treeWrapper.addEventListener('touchcancel', handleTouchEnd);
 }
 
 function applyTransform() {
