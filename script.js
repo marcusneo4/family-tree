@@ -1,6 +1,6 @@
 // Family Tree Data
 // Note: data is persisted in browser localStorage; we use a dataVersion to safely refresh defaults.
-const DEFAULT_DATA_VERSION = 6;
+const DEFAULT_DATA_VERSION = 7;
 
 function deepClone(obj) {
     if (typeof structuredClone === 'function') return structuredClone(obj);
@@ -26,8 +26,8 @@ const DEFAULT_FAMILY_DATA = {
         // Generation 2 (children + spouses)
         {
             couples: [
-                // 1. Ai Choo (Bloodline) & Curry
-                { people: [{ id: 101, name: "Ai Choo", gender: "female", photo: null, relationshipStatus: "married" }, { id: 102, name: "Curry", gender: "male", photo: null, relationshipStatus: "married" }], children: [201, 203, 204, 206, 208] },
+                // 1. SOON Ai Choo (Bloodline) & Tan Chye Huat
+                { people: [{ id: 101, name: "SOON Ai Choo", gender: "female", photo: null, relationshipStatus: "married" }, { id: 102, name: "Tan Chye Huat", gender: "male", photo: null, relationshipStatus: "married" }], children: [201, 203, 204, 206, 208] },
                 // 2. George (Bloodline) & Helen
                 { people: [{ id: 103, name: "George", gender: "male", photo: null, relationshipStatus: "married" }, { id: 104, name: "Helen", gender: "female", photo: "Family%20pics/Helen.jpg", relationshipStatus: "married" }], children: [210, 212, 214] },
                 // 3. Da Ee Ee (Bloodline) & Uncle John
@@ -55,12 +55,12 @@ const DEFAULT_FAMILY_DATA = {
         // Generation 3
         {
             couples: [
-                // Ai Choo & Curry
-                { people: [{ id: 201, name: "Irene", gender: "female", photo: "Family%20pics/Irene.jpg" }, { id: 202, name: "Shermaine", gender: "male", photo: "Family%20pics/Shermaine.jpg" }], children: [301, 302, 303] },
-                { people: [{ id: 203, name: "Julia", gender: "female", photo: "Family%20pics/Julia.jpg" }], children: [] },
-                { people: [{ id: 204, name: "Alice", gender: "female", photo: null }, { id: 205, name: "David", gender: "male", photo: "Family%20pics/David%203.jpg" }], children: [304, 305] },
-                { people: [{ id: 206, name: "Ah San", gender: "male", photo: null }, { id: 207, name: "Wife", gender: "female", photo: null }], children: [306, 307] },
-                { people: [{ id: 208, name: "Magdeline", gender: "female", photo: null }, { id: 209, name: "Charles", gender: "male", photo: "Family%20pics/Charles.jpg" }], children: [308, 309] },
+                // SOON Ai Choo & Tan Chye Huat (left side)
+                { people: [{ id: 201, name: "Tan Swee Hoon", gender: "female", photo: "Family%20pics/Irene.jpg" }, { id: 202, name: "Yap Hwee Jeck", gender: "male", photo: "Family%20pics/Shermaine.jpg" }], children: [301, 302, 303] },
+                { people: [{ id: 203, name: "Tan Geok Lan", gender: "female", photo: "Family%20pics/Julia.jpg" }], children: [] },
+                { people: [{ id: 204, name: "Tan Swee Choon", gender: "female", photo: null }, { id: 205, name: "David Chan", gender: "male", photo: "Family%20pics/David%203.jpg" }], children: [304, 305] },
+                { people: [{ id: 206, name: "Tan Poh Sang", gender: "male", photo: null }, { id: 207, name: "Foo Wan Jiao", gender: "female", photo: null }], children: [306, 307] },
+                { people: [{ id: 208, name: "Tan Geok Yong", gender: "female", photo: null }, { id: 209, name: "Charles Lim", gender: "male", photo: "Family%20pics/Charles.jpg" }], children: [308, 309] },
 
                 // George & Helen
                 { people: [{ id: 210, name: "Lynnette", gender: "female", photo: "Family%20pics/Lynette%20Tan.jpg" }, { id: 211, name: "Thaim Pong", gender: "male", photo: "Family%20pics/Thiam%20Pong.jpg" }], children: [310, 311] },
@@ -110,19 +110,19 @@ const DEFAULT_FAMILY_DATA = {
         // Generation 4
         {
             couples: [
-                // Irene & Shermaine
-                { people: [{ id: 301, name: "Alvin", gender: "male", photo: "Family%20pics/Alvin33.jpg" }], children: [] },
-                { people: [{ id: 302, name: "Daphene", gender: "female", photo: "Family%20pics/Daphene.jpg" }], children: [] },
-                { people: [{ id: 303, name: "Alston", gender: "male", photo: "Family%20pics/Alston.jpg" }], children: [] },
-                // Alice & David
-                { people: [{ id: 304, name: "Qi Qi", gender: "female", photo: "Family%20pics/Qi%20QI.jpg" }], children: [] },
-                { people: [{ id: 305, name: "Ting Ting", gender: "female", photo: "Family%20pics/Ting%20Ting.jpg" }], children: [] },
-                // Ah San & Wife
-                { people: [{ id: 306, name: "Daughter 1", gender: "female", photo: null }], children: [] },
-                { people: [{ id: 307, name: "Daughter 2", gender: "female", photo: null }], children: [] },
-                // Magdeline & Charles
-                { people: [{ id: 308, name: "Son 1", gender: "male", photo: "Family%20pics/Charles%20son.jpg" }], children: [] },
-                { people: [{ id: 309, name: "Son 2", gender: "male", photo: "Family%20pics/Charles%202nd%20son.jpg" }], children: [] },
+                // Tan Swee Hoon & Yap Hwee Jeck
+                { people: [{ id: 301, name: "Alvin Yap", gender: "male", photo: "Family%20pics/Alvin33.jpg" }], children: [] },
+                { people: [{ id: 302, name: "Daphne Yap", gender: "female", photo: "Family%20pics/Daphene.jpg" }], children: [] },
+                { people: [{ id: 303, name: "Alston Yap", gender: "male", photo: "Family%20pics/Alston.jpg" }], children: [] },
+                // Tan Swee Choon & David Chan
+                { people: [{ id: 304, name: "Liqi Chan", gender: "female", photo: "Family%20pics/Qi%20QI.jpg" }], children: [] },
+                { people: [{ id: 305, name: "Liting Chan", gender: "female", photo: "Family%20pics/Ting%20Ting.jpg" }], children: [] },
+                // Tan Poh Sang & Foo Wan Jiao
+                { people: [{ id: 306, name: "Tan Jiahui", gender: "female", photo: null }], children: [] },
+                { people: [{ id: 307, name: "Tan JiaQian", gender: "female", photo: null }], children: [] },
+                // Tan Geok Yong & Charles Lim
+                { people: [{ id: 308, name: "Caleb Lim", gender: "male", photo: "Family%20pics/Charles%20son.jpg" }], children: [] },
+                { people: [{ id: 309, name: "Caden Lim", gender: "male", photo: "Family%20pics/Charles%202nd%20son.jpg" }], children: [] },
 
                 // Lynnette & Thaim Pong
                 { people: [{ id: 310, name: "Yvette", gender: "female", photo: "Family%20pics/yvvette%20Tan.jpg", birthday: "01/01/1997" }], children: [] },
