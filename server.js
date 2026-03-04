@@ -10,36 +10,54 @@ const mimeTypes = {
   '.css': 'text/css',
   '.json': 'application/json',
   '.png': 'image/png',
-  '.jpg': 'image/jpg',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon'
 };
 
+const ROOT_DIR = path.resolve(__dirname);
+
 const server = http.createServer((req, res) => {
   console.log(`${req.method} ${req.url}`);
 
-  // Decode URL-encoded characters so files with spaces (e.g., "Family pics/Name Last.jpg") resolve correctly
-  let filePath = '.' + decodeURIComponent(req.url);
-  if (filePath === './') {
-    filePath = './index.html';
+  let urlPath;
+  try {
+    urlPath = decodeURIComponent(new URL(req.url || '/', 'http://localhost').pathname);
+  } catch (e) {
+    urlPath = '/';
+  }
+  if (urlPath === '/') urlPath = '/index.html';
+  const relativePath = urlPath.replace(/^\//, '') || 'index.html';
+
+  const filePath = path.join(ROOT_DIR, relativePath);
+  const resolvedPath = path.resolve(filePath);
+
+  // Prevent path traversal - ensure resolved path is within project root
+  if (!resolvedPath.startsWith(ROOT_DIR)) {
+    res.writeHead(403, { 'Content-Type': 'text/html' });
+    res.end('<h1>403 - Forbidden</h1>', 'utf-8');
+    return;
   }
 
-  const extname = String(path.extname(filePath)).toLowerCase();
+  const extname = String(path.extname(resolvedPath)).toLowerCase();
   const contentType = mimeTypes[extname] || 'application/octet-stream';
+  const isBinary = ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg'].includes(extname);
 
-  fs.readFile(filePath, (error, content) => {
+  fs.readFile(resolvedPath, (error, content) => {
     if (error) {
       if (error.code === 'ENOENT') {
         res.writeHead(404, { 'Content-Type': 'text/html' });
         res.end('<h1>404 - File Not Found</h1>', 'utf-8');
       } else {
-        res.writeHead(500);
-        res.end(`Server Error: ${error.code}`, 'utf-8');
+        console.error('Server error:', error);
+        res.writeHead(500, { 'Content-Type': 'text/html' });
+        res.end('<h1>500 - Server Error</h1>', 'utf-8');
       }
     } else {
       res.writeHead(200, { 'Content-Type': contentType });
-      res.end(content, 'utf-8');
+      res.end(content, isBinary ? undefined : 'utf-8');
     }
   });
 });

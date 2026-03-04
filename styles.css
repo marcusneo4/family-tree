@@ -370,6 +370,7 @@ body.dark-mode .title-cn {
     font-size: 22px;
     background: var(--gradient-primary);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -593,8 +594,6 @@ body.dark-mode .title-cn {
     color: white;
     font-size: 36px;
     font-weight: 700;
-    cursor: pointer;
-    transition: all 0.3s ease;
     border: 4px solid var(--border-color);
     box-shadow: var(--shadow-md);
     text-transform: uppercase;
@@ -638,6 +637,8 @@ body.dark-mode .title-cn {
     margin-bottom: 8px;
     text-align: center;
     line-height: 1.3;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 .person-age {
@@ -752,7 +753,7 @@ body.dark-mode .title-cn {
     left: 30px;
     font-size: 12px;
     font-weight: 600;
-    color: #999;
+    color: var(--text-tertiary);
     letter-spacing: 1px;
 }
 
@@ -771,12 +772,16 @@ body.dark-mode .title-cn {
 }
 
 .gallery-container::-webkit-scrollbar-track {
-    background: #f0f0f0;
+    background: var(--bg-secondary);
 }
 
 .gallery-container::-webkit-scrollbar-thumb {
-    background: #ccc;
+    background: var(--text-tertiary);
     border-radius: 2px;
+}
+
+.gallery-container::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
 }
 
 .gallery-photo {
@@ -822,7 +827,7 @@ body.dark-mode .title-cn {
     align-items: center;
     gap: 10px;
     font-weight: 600;
-    color: #666;
+    color: var(--text-secondary);
     padding: 20px;
 }
 
@@ -834,20 +839,21 @@ body.dark-mode .title-cn {
 .gallery-nav-btn {
     width: 36px;
     height: 36px;
-    border: 1px solid #e0e0e0;
-    background: white;
+    border: 2px solid var(--border-color);
+    background: var(--bg-primary);
     border-radius: 50%;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.3s ease;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 .gallery-nav-btn:hover {
-    background: #f5f5f5;
-    border-color: #999;
+    background: var(--bg-secondary);
+    border-color: var(--text-tertiary);
+    color: var(--text-primary);
 }
 
 .gallery-nav-btn.left {
@@ -1210,13 +1216,14 @@ body.dark-mode .title-cn {
 }
 
 .modal-content {
-    background-color: white;
+    background: var(--bg-primary);
     margin: 5% auto;
     padding: 30px;
     border-radius: 15px;
     width: 90%;
     max-width: 500px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-xl);
+    border: 2px solid var(--border-color);
     animation: slideDown 0.3s ease;
 }
 
@@ -1232,7 +1239,7 @@ body.dark-mode .title-cn {
 }
 
 .close {
-    color: #aaa;
+    color: var(--text-tertiary);
     float: right;
     font-size: 28px;
     font-weight: bold;
@@ -1242,11 +1249,11 @@ body.dark-mode .title-cn {
 }
 
 .close:hover {
-    color: #000;
+    color: var(--text-primary);
 }
 
 #modalTitle {
-    color: #333;
+    color: var(--text-primary);
     margin-bottom: 20px;
     font-size: 1.8em;
 }
@@ -1258,7 +1265,7 @@ body.dark-mode .title-cn {
 .form-group label {
     display: block;
     margin-bottom: 8px;
-    color: #333;
+    color: var(--text-primary);
     font-weight: 600;
 }
 
@@ -1267,9 +1274,11 @@ body.dark-mode .title-cn {
 .form-group textarea {
     width: 100%;
     padding: 12px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--border-color);
     border-radius: 8px;
     font-size: 1em;
+    background: var(--bg-primary);
+    color: var(--text-primary);
     transition: border-color 0.3s ease;
 }
 
@@ -1298,7 +1307,7 @@ body.dark-mode .title-cn {
 }
 
 .btn-primary {
-    background: #667eea;
+    background: var(--primary-color);
     color: white;
 }
 
@@ -1307,12 +1316,12 @@ body.dark-mode .title-cn {
 }
 
 .btn-secondary {
-    background: #f0f0f0;
-    color: #333;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
 .btn-secondary:hover {
-    background: #e0e0e0;
+    background: var(--border-color);
 }
 
 /* Print Styles */
@@ -1390,7 +1399,11 @@ body.dark-mode .title-cn {
         font-size: 18px;
     }
 
-    .app-title span {
+    .app-title .title-text {
+        font-size: 14px;
+    }
+
+    .app-title .title-cn {
         display: none;
     }
 
@@ -1563,13 +1576,13 @@ html {
 /* Profile Sidebar Styles */
 .profile-sidebar {
     width: 400px;
-    background-color: white;
-    border-left: 1px solid #e0e0e0;
+    background: var(--bg-primary);
+    border-left: 2px solid var(--border-color);
     display: none;
     flex-shrink: 0;
     height: 100%;
     overflow-y: auto;
-    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--shadow-lg);
 }
 
 .profile-sidebar.active {
@@ -1591,14 +1604,14 @@ html {
 .profile-title {
     font-size: 14px;
     font-weight: 600;
-    color: #999;
+    color: var(--text-tertiary);
     letter-spacing: 1px;
     text-transform: uppercase;
     margin: 0;
 }
 
 .profile-close {
-    color: #000;
+    color: var(--text-primary);
     font-size: 28px;
     font-weight: bold;
     cursor: pointer;
@@ -1612,7 +1625,7 @@ html {
 }
 
 .profile-close:hover {
-    color: #666;
+    color: var(--text-secondary);
 }
 
 .profile-body {
@@ -1635,7 +1648,7 @@ html {
 .profile-edit-form .form-group label {
     display: block;
     margin-bottom: 8px;
-    color: #333;
+    color: var(--text-primary);
     font-weight: 600;
     font-size: 14px;
 }
@@ -1645,10 +1658,12 @@ html {
 .profile-edit-form .form-group textarea {
     width: 100%;
     padding: 10px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--border-color);
     border-radius: 8px;
     font-size: 14px;
     font-family: inherit;
+    background: var(--bg-primary);
+    color: var(--text-primary);
     transition: border-color 0.3s ease;
 }
 
@@ -1752,7 +1767,7 @@ html {
 .profile-name {
     font-size: 28px;
     font-weight: 700;
-    color: #1a365d;
+    color: var(--text-primary);
     margin-bottom: 12px;
 }
 
@@ -1762,13 +1777,13 @@ html {
     justify-content: center;
     gap: 8px;
     font-size: 14px;
-    color: #666;
+    color: var(--text-secondary);
     margin-bottom: 30px;
 }
 
 .profile-birthdate i {
     font-size: 14px;
-    color: #999;
+    color: var(--text-tertiary);
 }
 
 .profile-birthdate span {
@@ -1783,7 +1798,7 @@ html {
 .biography-label {
     font-size: 12px;
     font-weight: 600;
-    color: #999;
+    color: var(--text-tertiary);
     letter-spacing: 1px;
     text-transform: uppercase;
     margin-bottom: 10px;
@@ -1791,19 +1806,20 @@ html {
 }
 
 .biography-content {
-    background: #f5f5f5;
+    background: var(--bg-secondary);
     border-radius: 8px;
     padding: 15px;
     font-size: 14px;
-    color: #666;
+    color: var(--text-secondary);
     text-align: left;
     min-height: 60px;
     font-style: italic;
+    border: 2px solid var(--border-color);
 }
 
 .biography-content:not(:empty):not(.empty-bio) {
     font-style: normal;
-    color: #333;
+    color: var(--text-primary);
 }
 
 .profile-actions {
@@ -1826,7 +1842,7 @@ html {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    background: white;
+    background: var(--bg-primary);
 }
 
 .profile-btn i {
@@ -1859,7 +1875,7 @@ html {
 .family-members-section {
     width: 100%;
     margin-top: 30px;
-    border-top: 1px solid #e0e0e0;
+    border-top: 2px solid var(--border-color);
     padding-top: 20px;
 }
 
@@ -1870,7 +1886,7 @@ html {
 .family-label {
     font-size: 12px;
     font-weight: 600;
-    color: #999;
+    color: var(--text-tertiary);
     letter-spacing: 1px;
     text-transform: uppercase;
     margin-bottom: 10px;
@@ -1884,31 +1900,31 @@ html {
 
 .family-member-item {
     padding: 8px 12px;
-    background: #f5f5f5;
+    background: var(--bg-secondary);
     border-radius: 6px;
     font-size: 14px;
-    color: #333;
+    color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s ease;
-    border: 1px solid transparent;
+    border: 2px solid transparent;
 }
 
 .family-member-item:hover {
-    background: #e9e9e9;
-    border-color: #667eea;
-    color: #667eea;
+    background: var(--bg-tertiary);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
 }
 
 .family-member-item.empty {
-    color: #999;
+    color: var(--text-tertiary);
     font-style: italic;
     cursor: default;
 }
 
 .family-member-item.empty:hover {
-    background: #f5f5f5;
+    background: var(--bg-secondary);
     border-color: transparent;
-    color: #999;
+    color: var(--text-tertiary);
 }
 
 .inline-checkbox .checkbox-label {

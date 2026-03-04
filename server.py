@@ -19,7 +19,7 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(DIRECTORY), **kwargs)
     
     def end_headers(self):
-        # Add CORS headers for local development
+        # Cache-control headers to avoid stale content during development
         self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
         self.send_header('Expires', '0')
         super().end_headers()
@@ -48,7 +48,7 @@ def start_server():
         try:
             webbrowser.open(f'http://localhost:{PORT}')
             print("🚀 Opening browser automatically...\n")
-        except:
+        except OSError as e:
             print("⚠️  Could not open browser automatically.")
             print(f"   Please manually open: http://localhost:{PORT}\n")
         

@@ -7,6 +7,30 @@ function deepClone(obj) {
     return JSON.parse(JSON.stringify(obj));
 }
 
+// XSS: Escape user content for safe use in HTML
+function escapeHtml(str) {
+    if (str == null || typeof str !== 'string') return '';
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// XSS: Sanitize photo URL - allow only relative paths, https, http, data:image
+function sanitizePhotoUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    const s = url.trim();
+    if (!s) return '';
+    const lower = s.toLowerCase();
+    if (lower.startsWith('javascript:') || lower.startsWith('vbscript:') || lower.startsWith('data:text/html')) return '';
+    if (lower.startsWith('data:image/')) return s;
+    if (lower.startsWith('https://') || lower.startsWith('http://')) return s;
+    if (s.startsWith('/') || s.startsWith('./') || !s.includes(':')) return s;
+    return '';
+}
+
 const DEFAULT_FAMILY_DATA = {
     dataVersion: DEFAULT_DATA_VERSION,
     generations: [
@@ -160,6 +184,16 @@ const DEFAULT_FAMILY_DATA = {
 let familyData = deepClone(DEFAULT_FAMILY_DATA);
 let didResetStoredData = false;
 
+// UI and zoom constants
+const ZOOM_MIN = 0.3;
+const ZOOM_MAX = 3;
+const ZOOM_STEP = 0.1;
+const TOAST_DURATION_MS = 5000;
+const RENDER_DEBOUNCE_MS = 150;
+const SIDEBAR_REOPEN_DELAY_MS = 100;
+const GALLERY_SCROLL_AMOUNT = 200;
+const CONNECTOR_REDRAW_DELAY_MS = 100;
+
 let currentZoom = 1;
 let panX = 0;
 let panY = 0;
@@ -252,6 +286,22 @@ function getEffectiveRelationshipStatus(person) {
     return 'single';
 }
 
+// Validate that loaded data has expected structure
+function isValidFamilyData(parsed) {
+    if (!parsed || typeof parsed !== 'object') return false;
+    if (!Array.isArray(parsed.generations)) return false;
+    for (const gen of parsed.generations) {
+        if (!gen || !Array.isArray(gen.couples)) return false;
+        for (const couple of gen.couples) {
+            if (!couple || !Array.isArray(couple.people)) return false;
+            for (const p of couple.people) {
+                if (!p || typeof p.id === 'undefined') return false;
+            }
+        }
+    }
+    return true;
+}
+
 // Load data from localStorage
 function loadData() {
     const saved = localStorage.getItem('familyTreeData');
@@ -261,16 +311,15 @@ function loadData() {
             if (
                 parsed &&
                 parsed.dataVersion === DEFAULT_DATA_VERSION &&
-                Array.isArray(parsed.generations)
+                isValidFamilyData(parsed)
             ) {
                 familyData = parsed;
                 return;
             }
         } catch (e) {
-            console.error('Error loading saved data:', e);
+            console.error('Error loading saved data:', e?.message || String(e));
         }
 
-        // Saved data exists but is outdated/corrupted; reset to defaults.
         familyData = deepClone(DEFAULT_FAMILY_DATA);
         didResetStoredData = true;
         saveData();
@@ -279,7 +328,15 @@ function loadData() {
 
 // Save data to localStorage
 function saveData() {
-    localStorage.setItem('familyTreeData', JSON.stringify(familyData));
+    try {
+        localStorage.setItem('familyTreeData', JSON.stringify(familyData));
+    } catch (e) {
+        if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22)) {
+            showToast('Storage full. Unable to save. Try removing some data or clear site storage.', 'error');
+        } else {
+            showToast('Unable to save data. Please try again.', 'error');
+        }
+    }
 }
 
 // Initialize
@@ -371,11 +428,11 @@ function setupEventListeners() {
     const modeQuizBtn = document.getElementById('modeQuizBtn');
     const quizCheckBtn = document.getElementById('quizCheckBtn');
 
-    closeBtn.onclick = () => closeModal();
-    cancelBtn.onclick = () => closeModal();
-    
+    if (closeBtn) closeBtn.onclick = () => closeModal();
+    if (cancelBtn) cancelBtn.onclick = () => closeModal();
+
     window.onclick = (event) => {
-        if (event.target == modal) {
+        if (modal && event.target === modal) {
             closeModal();
         }
     };
@@ -416,33 +473,41 @@ function setupEventListeners() {
         };
     }
 
-    form.onsubmit = (e) => {
-        e.preventDefault();
-        saveMember();
-    };
+    if (form) {
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            saveMember();
+        };
+    }
 
-    zoomInBtn.onclick = () => {
-        currentZoom = Math.min(currentZoom + 0.1, 3);
+    if (zoomInBtn) zoomInBtn.onclick = () => {
+        currentZoom = Math.min(currentZoom + ZOOM_STEP, ZOOM_MAX);
+        applyTransform();
+    };
+    if (zoomOutBtn) zoomOutBtn.onclick = () => {
+        currentZoom = Math.max(currentZoom - ZOOM_STEP, ZOOM_MIN);
         applyTransform();
     };
 
-    zoomOutBtn.onclick = () => {
-        currentZoom = Math.max(currentZoom - 0.1, 0.3);
-        applyTransform();
-    };
-
-    fullscreenBtn.onclick = () => {
-        const elem = document.body;
-        if (!document.fullscreenElement) {
-            elem.requestFullscreen().catch(err => {
-                console.error('Error attempting to enable fullscreen:', err);
-            });
-            fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
-        } else {
-            document.exitFullscreen();
-            fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
-        }
-    };
+    if (fullscreenBtn) {
+        fullscreenBtn.onclick = () => {
+            const elem = document.body;
+            if (!document.fullscreenElement) {
+                elem.requestFullscreen().catch(err => {
+                    showToast('Fullscreen is not available.', 'warning');
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        };
+        document.addEventListener('fullscreenchange', () => {
+            if (fullscreenBtn) {
+                fullscreenBtn.innerHTML = document.fullscreenElement
+                    ? '<i class="fas fa-compress"></i>'
+                    : '<i class="fas fa-expand"></i>';
+            }
+        });
+    }
 
     if (bloodlineFilterBtn) {
         bloodlineFilterBtn.onclick = () => {
@@ -465,15 +530,18 @@ function setupEventListeners() {
         };
     }
 
-    galleryPrevBtn.onclick = () => {
-        const gallery = document.getElementById('photoGallery');
-        gallery.scrollBy({ left: -200, behavior: 'smooth' });
-    };
-
-    galleryNextBtn.onclick = () => {
-        const gallery = document.getElementById('photoGallery');
-        gallery.scrollBy({ left: 200, behavior: 'smooth' });
-    };
+    if (galleryPrevBtn) {
+        galleryPrevBtn.onclick = () => {
+            const gallery = document.getElementById('photoGallery');
+            if (gallery) gallery.scrollBy({ left: -GALLERY_SCROLL_AMOUNT, behavior: 'smooth' });
+        };
+    }
+    if (galleryNextBtn) {
+        galleryNextBtn.onclick = () => {
+            const gallery = document.getElementById('photoGallery');
+            if (gallery) gallery.scrollBy({ left: GALLERY_SCROLL_AMOUNT, behavior: 'smooth' });
+        };
+    }
 
     // Dark mode toggle
     if (darkModeBtn) {
@@ -504,7 +572,7 @@ function setupEventListeners() {
     }
 
     // Export functionality
-    if (exportBtn) {
+    if (exportBtn && exportMenu) {
         exportBtn.onclick = (e) => {
             e.stopPropagation();
             exportMenu.classList.toggle('active');
@@ -533,14 +601,16 @@ function setupEventListeners() {
 
     // Close export menu when clicking outside
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('#exportBtn') && !e.target.closest('#exportMenu')) {
+        if (exportMenu && !e.target.closest('#exportBtn') && !e.target.closest('#exportMenu')) {
             exportMenu.classList.remove('active');
         }
     });
 
-    // Redraw lines on window resize
+    // Redraw lines on window resize (debounced)
+    let resizeTimeout;
     window.addEventListener('resize', () => {
-        setTimeout(drawConnectionLines, 100);
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(drawConnectionLines, RENDER_DEBOUNCE_MS);
     });
 
     // Pan and Zoom handlers
@@ -550,7 +620,8 @@ function setupEventListeners() {
 function setupPanAndZoom() {
     const treeWrapper = document.getElementById('treeWrapper');
     const treeContainer = document.getElementById('treeContainer');
-    const clampZoom = (value) => Math.max(0.3, Math.min(3, value));
+    if (!treeWrapper || !treeContainer) return;
+    const clampZoom = (value) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, value));
     const shouldIgnorePanStart = (target) => (
         target.closest('.person-card') ||
         target.closest('.control-btn') ||
@@ -633,7 +704,7 @@ function setupPanAndZoom() {
         const mouseY = e.clientY - rect.top;
 
         const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-        const newZoom = Math.max(0.3, Math.min(3, currentZoom * zoomFactor));
+        const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, currentZoom * zoomFactor));
 
         // Calculate zoom point in container coordinates
         const zoomPointX = (mouseX - panX) / currentZoom;
@@ -728,13 +799,14 @@ function applyTransform() {
     const treeContainer = document.getElementById('treeContainer');
     treeContainer.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
     treeContainer.style.transformOrigin = '0 0';
-    setTimeout(drawConnectionLines, 100);
+    setTimeout(drawConnectionLines, CONNECTOR_REDRAW_DELAY_MS);
 }
 
 function filterTree(query) {
     const cards = document.querySelectorAll('.person-card');
     cards.forEach(card => {
-        const name = card.querySelector('.person-name').textContent.toLowerCase();
+        const nameEl = card.querySelector('.person-name');
+        const name = (nameEl?.textContent || '').toLowerCase();
         const isBloodline = card.dataset.isBloodline === '1';
 
         const matchesSearch = name.includes(query) || query === '';
@@ -763,13 +835,8 @@ function setViewMode(mode, options = {}) {
     currentViewMode = mode;
     applyModeButtonState();
     updateQuizButtonVisibility();
-    if (mode !== VIEW_MODES.QUIZ) {
-        resetQuizState();
-    } else {
-        // Fresh quiz session whenever entering quiz mode
-        resetQuizState();
-    }
-    
+    resetQuizState();
+
     // Hide/show gallery section based on mode
     const gallerySection = document.querySelector('.photo-gallery');
     const mainWrapper = document.querySelector('.main-content-wrapper');
@@ -780,8 +847,7 @@ function setViewMode(mode, options = {}) {
         mainWrapper.classList.toggle('mode-discreet', mode === VIEW_MODES.DISCREET);
     }
     
-    renderTree();
-    renderPhotoGallery();
+    refreshUI();
 
     if (!options.silent) {
         const messageMap = {
@@ -791,6 +857,18 @@ function setViewMode(mode, options = {}) {
         };
         showToast(messageMap[mode] || `Switched to ${mode} mode`, 'info');
     }
+}
+
+// Get next available person ID (safe when no people exist)
+function getNextPersonId() {
+    const ids = getAllPeople().map(p => p.id).filter(id => typeof id === 'number' && !isNaN(id));
+    return ids.length > 0 ? Math.max(...ids) + 1 : 1;
+}
+
+// Refresh tree and gallery (single entry point for UI updates)
+function refreshUI(options = {}) {
+    if (options.tree !== false) renderTree();
+    if (options.gallery !== false) renderPhotoGallery();
 }
 
 // Get all people as flat array
@@ -961,8 +1039,9 @@ function renderTree() {
         document.querySelectorAll('.edit-btn').forEach(btn => {
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
-                const personId = parseInt(this.closest('.person-card').dataset.personId);
-                editPerson(personId);
+                const card = this.closest('.person-card');
+                const personId = card ? parseInt(card.dataset.personId, 10) : null;
+                if (personId != null && !isNaN(personId)) editPerson(personId);
             });
         });
         
@@ -1021,6 +1100,25 @@ function renderCoupleSubtree(location) {
 }
 
 // Generate initials from name
+// Fallback when person photo fails to load - replace with placeholder
+function handlePhotoError(imgEl, personId) {
+    if (!imgEl || imgEl.dataset.fallbackHandled === '1') return;
+    imgEl.dataset.fallbackHandled = '1';
+    const person = personId ? findPersonById(parseInt(personId, 10)) : null;
+    if (person) {
+        const initials = getInitials(person.name);
+        const genderClass = person.gender || 'male';
+        const generationClass = getGenerationClass(person.id);
+        const placeholder = document.createElement('div');
+        placeholder.className = `person-placeholder ${genderClass} ${generationClass}`;
+        placeholder.textContent = initials;
+        imgEl.replaceWith(placeholder);
+    } else {
+        imgEl.style.visibility = 'hidden';
+        imgEl.style.pointerEvents = 'none';
+    }
+}
+
 function getInitials(name) {
     if (!name) return '?';
     const parts = name.trim().split(/\s+/);
@@ -1090,10 +1188,13 @@ function renderPersonCard(person) {
     
     const quizGuessPhoto = quizAssignments[person.id];
     const showPhoto = shouldShowPhotoOnTree(person);
-    const photoSrc = currentViewMode === VIEW_MODES.QUIZ ? quizGuessPhoto : person.photo;
+    const rawPhotoSrc = currentViewMode === VIEW_MODES.QUIZ ? quizGuessPhoto : person.photo;
+    const photoSrc = sanitizePhotoUrl(rawPhotoSrc);
+    const escapedName = escapeHtml(person.name || '');
+    const escapedInitials = escapeHtml(initials);
     const photoHtml = showPhoto && photoSrc
-        ? `<img src="${photoSrc}" alt="${person.name}" class="person-photo">`
-        : `<div class="person-placeholder ${genderClass} ${generationClass}">${initials}</div>`;
+        ? `<img src="${escapeHtml(photoSrc)}" alt="${escapedName}" class="person-photo" data-person-id="${person.id}" onerror="handlePhotoError(this,${person.id})" loading="lazy">`
+        : `<div class="person-placeholder ${genderClass} ${generationClass}">${escapedInitials}</div>`;
     
     // Count children
     const childCounts = countChildrenByGender(person.id);
@@ -1163,6 +1264,8 @@ function renderPersonCard(person) {
            </div>`
         : '';
 
+    const safeRelationClass = ['single', 'bf_gf', 'dating', 'married'].includes(relationshipStatus) ? relationshipStatus : 'single';
+    const escapedBirthday = escapeHtml(birthdayDisplay);
     return `
         <div class="person-card" data-person-id="${person.id}" data-is-bloodline="${isBloodline ? '1' : '0'}">
             ${passedOnBadge}
@@ -1171,10 +1274,10 @@ function renderPersonCard(person) {
             ${quizStatus}
             <button class="edit-btn"><i class="fas fa-pencil-alt"></i></button>
             ${photoHtml}
-            <div class="person-name">${person.name}</div>
-            ${showRelationshipPill ? `<div class="relationship-pill ${relationshipStatus}">${relationshipLabel}</div>` : ''}
-            ${ageDisplay ? `<div class="person-age">${ageDisplay}</div>` : ''}
-            ${birthdayDisplay ? `<div class="person-birthday"><i class="fas fa-birthday-cake"></i>${birthdayDisplay}</div>` : ''}
+            <div class="person-name">${escapeHtml(person.name || '')}</div>
+            ${showRelationshipPill ? `<div class="relationship-pill ${safeRelationClass}">${escapeHtml(relationshipLabel)}</div>` : ''}
+            ${ageDisplay ? `<div class="person-age">${escapeHtml(ageDisplay)}</div>` : ''}
+            ${birthdayDisplay ? `<div class="person-birthday"><i class="fas fa-birthday-cake"></i>${escapedBirthday}</div>` : ''}
             ${genderDotsHtml}
         </div>
     `;
@@ -1195,7 +1298,7 @@ function showToast(message, type = 'success') {
     
     toast.innerHTML = `
         <i class="fas ${iconMap[type] || iconMap.info} toast-icon"></i>
-        <div class="toast-message">${message}</div>
+        <div class="toast-message">${escapeHtml(String(message ?? ''))}</div>
         <i class="fas fa-times toast-close"></i>
     `;
     
@@ -1205,8 +1308,7 @@ function showToast(message, type = 'success') {
     const closeBtn = toast.querySelector('.toast-close');
     closeBtn.onclick = () => removeToast(toast);
     
-    // Auto remove after 5 seconds
-    setTimeout(() => removeToast(toast), 5000);
+    setTimeout(() => removeToast(toast), TOAST_DURATION_MS);
 }
 
 function removeToast(toast) {
@@ -1222,7 +1324,11 @@ function removeToast(toast) {
 function toggleDarkMode() {
     document.body.classList.toggle('dark-mode');
     const isDarkMode = document.body.classList.contains('dark-mode');
-    localStorage.setItem('darkMode', isDarkMode);
+    try {
+        localStorage.setItem('darkMode', isDarkMode);
+    } catch (e) {
+        // Ignore QuotaExceededError for dark mode preference
+    }
     
     const icon = document.querySelector('#darkModeBtn i');
     if (isDarkMode) {
@@ -1248,13 +1354,13 @@ function loadDarkModePreference() {
 // Statistics Modal
 function openStatsModal() {
     const modal = document.getElementById('statsModal');
-    modal.classList.add('active');
+    if (modal) modal.classList.add('active');
     generateStats();
 }
 
 function closeStatsModal() {
     const modal = document.getElementById('statsModal');
-    modal.classList.remove('active');
+    if (modal) modal.classList.remove('active');
 }
 
 function generateStats() {
@@ -1384,11 +1490,10 @@ function refreshPhotos() {
     });
     
     saveData();
-    renderTree();
-    renderPhotoGallery();
-    
+    refreshUI();
+
     if (selectedPersonId) {
-        setTimeout(() => openProfileSidebar(selectedPersonId), 100);
+        setTimeout(() => openProfileSidebar(selectedPersonId), SIDEBAR_REOPEN_DELAY_MS);
     }
     
     showToast(`Removed ${removedCount} photo(s) from the tree`, 'success');
@@ -1664,18 +1769,23 @@ function renderPhotoGallery() {
         const photoPath = `Family%20pics/${encodedName}`;
         const isUsed = currentViewMode !== VIEW_MODES.QUIZ && usedPhotoNames.has(normalizedName);
         const usedClass = isUsed ? ' photo-used' : '';
+        const safeFileName = escapeHtml((fileName || '').replace('.jpg', ''));
         html += `
-            <img src="${photoPath}" 
-                 alt="${fileName.replace('.jpg', '')}" 
+            <img src="${escapeHtml(photoPath)}" 
+                 alt="${safeFileName}" 
                  class="gallery-photo draggable-photo${usedClass}" 
                  draggable="true"
-                 data-photo-path="${photoPath}">
+                 data-photo-path="${photoPath}"
+                 loading="lazy"
+                 onerror="this.onerror=null;this.style.opacity='0.3';this.style.pointerEvents='none';this.title='Photo failed to load';">
         `;
     });
     
     // Also add photos that are already assigned to people (if any)
     allPeople.forEach(person => {
         if (!person.photo) return;
+        const safePhotoUrl = sanitizePhotoUrl(person.photo);
+        if (!safePhotoUrl) return;
         const parts = person.photo.split('/');
         const filename = parts[parts.length - 1] || '';
         const normalizedName = normalizeNameForMatch(decodeURIComponent(filename));
@@ -1683,11 +1793,14 @@ function renderPhotoGallery() {
         
         const isUsed = currentViewMode !== VIEW_MODES.QUIZ && usedPhotoNames.has(normalizedName);
         const usedClass = isUsed ? ' photo-used' : '';
+        const safePersonName = escapeHtml(person.name || '');
         html += `
-            <img src="${person.photo}" 
-                 alt="${person.name}" 
+            <img src="${escapeHtml(safePhotoUrl)}" 
+                 alt="${safePersonName}" 
                  class="gallery-photo${usedClass}" 
                  data-person-id="${person.id}"
+                 loading="lazy"
+                 onerror="this.onerror=null;this.style.opacity='0.3';this.style.pointerEvents='none';this.title='Photo failed to load';"
                  onclick="openProfileSidebar(${person.id})">
         `;
     });
@@ -1744,12 +1857,8 @@ function handlePhotoDrop(personId, photoPath) {
     if (currentViewMode === VIEW_MODES.QUIZ) {
         // Do not persist; store guess in-memory
         quizAssignments[personId] = photoPath;
-        // Clear prior result for this person (they're trying again)
-        if (quizResults[personId] !== undefined) {
-            delete quizResults[personId];
-        }
-        renderTree();
-        renderPhotoGallery();
+        if (quizResults[personId] !== undefined) delete quizResults[personId];
+        refreshUI();
         showToast(`Guess saved for ${person.name}.`, 'info');
         return;
     }
@@ -1757,16 +1866,12 @@ function handlePhotoDrop(personId, photoPath) {
     // Update person's photo (normal modes)
     person.photo = photoPath;
     
-    // Save data
     saveData();
-    
-    // Re-render tree and gallery
-    renderTree();
-    renderPhotoGallery();
-    
+    refreshUI();
+
     // Update profile sidebar if it's open for this person
     if (selectedPersonId === personId) {
-        setTimeout(() => openProfileSidebar(personId), 100);
+        setTimeout(() => openProfileSidebar(personId), SIDEBAR_REOPEN_DELAY_MS);
     }
     
     showToast(`Photo assigned to ${person.name}!`, 'success');
@@ -1777,7 +1882,8 @@ function drawConnectionLines() {
     const svg = document.getElementById('connectionLines');
     const treeContainer = document.getElementById('treeContainer');
     const treeElement = document.getElementById('familyTree');
-    
+    if (!svg || !treeContainer || !treeElement) return;
+
     // Clear existing lines
     svg.innerHTML = '';
     
@@ -1915,10 +2021,12 @@ function openModal(person = null) {
     const modal = document.getElementById('memberModal');
     const form = document.getElementById('memberForm');
     const title = document.getElementById('modalTitle');
-    const relationField = document.getElementById('relation').closest('.form-group');
+    const relationEl = document.getElementById('relation');
+    const relationField = relationEl ? relationEl.closest('.form-group') : null;
     const relationshipSelect = document.getElementById('relationshipStatus');
     const passedOnCheckbox = document.getElementById('passedOn');
 
+    if (!modal || !form) return;
     form.reset();
     
     // Show relation field
@@ -1958,23 +2066,32 @@ function openModal(person = null) {
 }
 
 function closeModal() {
-    document.getElementById('memberModal').style.display = 'none';
+    const modal = document.getElementById('memberModal');
+    if (modal) modal.style.display = 'none';
 }
 
 // Open modal for adding a child
 function openModalForAddChild(parentId) {
+    const parentIdNum = parseInt(parentId, 10);
+    if (isNaN(parentIdNum) || !findPersonById(parentIdNum)) {
+        showToast('Invalid parent. Please try again.', 'error');
+        return;
+    }
     const modal = document.getElementById('memberModal');
     const form = document.getElementById('memberForm');
     const title = document.getElementById('modalTitle');
     const relationshipSelect = document.getElementById('relationshipStatus');
     const passedOnCheckbox = document.getElementById('passedOn');
-    
+    if (!modal || !form) return;
+
     form.reset();
-    title.textContent = 'Add Child';
-    
-    // Hide relation field since we're adding a child
-    const relationField = document.getElementById('relation').closest('.form-group');
-    if (relationField) relationField.style.display = 'none';
+    if (title) title.textContent = 'Add Child';
+
+    const relationEl = document.getElementById('relation');
+    if (relationEl) {
+        const relationField = relationEl.closest('.form-group');
+        if (relationField) relationField.style.display = 'none';
+    }
     if (relationshipSelect) {
         relationshipSelect.value = 'single';
     }
@@ -1982,7 +2099,7 @@ function openModalForAddChild(parentId) {
         passedOnCheckbox.checked = false;
     }
     
-    form.dataset.parentId = parentId;
+    form.dataset.parentId = String(parentIdNum);
     form.dataset.relation = 'child';
     delete form.dataset.editId;
     
@@ -1991,34 +2108,32 @@ function openModalForAddChild(parentId) {
 
 // Open modal for adding a spouse
 function openModalForAddSpouse(personId) {
+    const personIdNum = parseInt(personId, 10);
+    const person = findPersonById(personIdNum);
+    if (!person) {
+        showToast('Person not found. Please try again.', 'error');
+        return;
+    }
     const modal = document.getElementById('memberModal');
     const form = document.getElementById('memberForm');
+    if (!modal || !form) return;
     const title = document.getElementById('modalTitle');
-    const person = findPersonById(personId);
     const relationshipSelect = document.getElementById('relationshipStatus');
     const passedOnCheckbox = document.getElementById('passedOn');
-    
+    const relationEl = document.getElementById('relation');
+
     form.reset();
-    title.textContent = 'Add Spouse';
-    
-    // Hide relation field since we're adding a spouse
-    const relationField = document.getElementById('relation').closest('.form-group');
-    if (relationField) relationField.style.display = 'none';
-    
-    // Set opposite gender by default
-    if (person) {
-        const genderSelect = document.getElementById('gender');
-        genderSelect.value = person.gender === 'male' ? 'female' : 'male';
+    if (title) title.textContent = 'Add Spouse';
+
+    if (relationEl) {
+        const relationField = relationEl.closest('.form-group');
+        if (relationField) relationField.style.display = 'none';
     }
-    
-    if (relationshipSelect) {
-        relationshipSelect.value = 'married';
-    }
-    if (passedOnCheckbox) {
-        passedOnCheckbox.checked = false;
-    }
-    
-    form.dataset.personId = personId;
+    const genderSelect = document.getElementById('gender');
+    if (genderSelect) genderSelect.value = person.gender === 'male' ? 'female' : 'male';
+    if (relationshipSelect) relationshipSelect.value = 'married';
+    if (passedOnCheckbox) passedOnCheckbox.checked = false;
+    form.dataset.personId = String(personIdNum);
     form.dataset.relation = 'spouse';
     delete form.dataset.editId;
     
@@ -2026,8 +2141,9 @@ function openModalForAddSpouse(personId) {
 }
 
 function editPerson(personId) {
-    // Edit button now opens the sidebar with the profile
-    openProfileSidebar(personId);
+    const id = typeof personId === 'number' ? personId : parseInt(personId, 10);
+    if (isNaN(id)) return;
+    openProfileSidebar(id);
 }
 
 // Helper function to split name into first and last name
@@ -2098,10 +2214,12 @@ function formatBirthdayToDDMMYYYY(birthday) {
 
 // Profile Sidebar Functions
 function openProfileSidebar(personId) {
-    const person = findPersonById(personId);
+    const id = typeof personId === 'number' ? personId : parseInt(personId, 10);
+    if (isNaN(id)) return;
+    const person = findPersonById(id);
     if (!person) return;
     
-    selectedPersonId = personId;
+    selectedPersonId = id;
 
     const profileSidebar = document.getElementById('profileSidebar');
     const profilePhoto = document.getElementById('profilePhoto');
@@ -2118,28 +2236,46 @@ function openProfileSidebar(personId) {
     const profileRelationship = document.getElementById('profileRelationship');
     const profilePassedOn = document.getElementById('profilePassedOn');
 
-    // Set photo or placeholder with initials
+    if (!profileSidebar || !profilePhoto || !profilePhotoPlaceholder || !profileEditForm) {
+        showToast('Unable to open profile. Please try again.', 'error');
+        return;
+    }
+
     if (person.photo) {
-        profilePhoto.src = person.photo;
+        const safePhoto = sanitizePhotoUrl(person.photo);
+        if (safePhoto) {
+            profilePhoto.src = safePhoto;
+        profilePhoto.alt = person.name || 'Profile photo';
         profilePhoto.style.display = 'block';
+        profilePhoto.style.visibility = 'visible';
+        profilePhoto.dataset.fallbackHandled = '0';
+        profilePhoto.onerror = function() {
+            if (this.dataset.fallbackHandled === '1') return;
+            this.dataset.fallbackHandled = '1';
+            this.style.display = 'none';
+            profilePhotoPlaceholder.style.display = 'flex';
+            profilePhotoPlaceholder.textContent = getInitials(person.name);
+            profilePhotoPlaceholder.className = `profile-photo-placeholder ${person.gender || 'male'} ${getGenerationClass(person.id)}`;
+            setupDropZone(profilePhotoPlaceholder, id);
+        };
         profilePhotoPlaceholder.style.display = 'none';
-        // Setup drop zone on photo
-        setupDropZone(profilePhoto, personId);
+        setupDropZone(profilePhoto, id);
+        } else {
+            profilePhoto.style.display = 'none';
+            profilePhotoPlaceholder.style.display = 'flex';
+            profilePhotoPlaceholder.textContent = getInitials(person.name);
+            profilePhotoPlaceholder.className = `profile-photo-placeholder ${person.gender || 'male'} ${getGenerationClass(person.id)}`;
+            setupDropZone(profilePhotoPlaceholder, id);
+        }
     } else {
         profilePhoto.style.display = 'none';
         profilePhotoPlaceholder.style.display = 'flex';
-        const initials = getInitials(person.name);
-        const generationClass = getGenerationClass(person.id);
-        const genderClass = person.gender || 'male';
-        profilePhotoPlaceholder.innerHTML = initials;
-        profilePhotoPlaceholder.className = `profile-photo-placeholder ${genderClass} ${generationClass}`;
-        // Setup drop zone on placeholder
-        setupDropZone(profilePhotoPlaceholder, personId);
+        profilePhotoPlaceholder.textContent = getInitials(person.name);
+        profilePhotoPlaceholder.className = `profile-photo-placeholder ${person.gender || 'male'} ${getGenerationClass(person.id)}`;
+        setupDropZone(profilePhotoPlaceholder, id);
     }
-    
-    // Also setup drop zone on the container as fallback
     if (profilePhotoContainer) {
-        setupDropZone(profilePhotoContainer, personId);
+        setupDropZone(profilePhotoContainer, id);
     }
 
     // Split name into first and last
@@ -2172,76 +2308,64 @@ function openProfileSidebar(personId) {
     // Set biography
     profileBiography.value = person.biography || '';
 
-    // Store person ID in form and buttons for actions
-    profileEditForm.dataset.personId = personId;
-    addChildBtn.dataset.personId = personId;
-    addSpouseBtn.dataset.personId = personId;
+    profileEditForm.dataset.personId = String(id);
+    addChildBtn.dataset.personId = String(id);
+    addSpouseBtn.dataset.personId = String(id);
+    displayFamilyMembers(id);
 
-    // Display family members
-    displayFamilyMembers(personId);
-
-    // Show sidebar
     profileSidebar.classList.add('active');
 }
 
-// Display family members in the profile sidebar
+function renderFamilyListItems(people, emptyLabel) {
+    if (!people.length) return `<div class="family-member-item empty">${emptyLabel}</div>`;
+    return people.map(p =>
+        `<div class="family-member-item" onclick="openProfileSidebar(${p.id})">${escapeHtml(p.name || '')}</div>`
+    ).join('');
+}
+
 function displayFamilyMembers(personId) {
     const parentsContainer = document.getElementById('profileParents');
     const childrenContainer = document.getElementById('profileChildren');
     const grandchildrenContainer = document.getElementById('profileGrandchildren');
-    
-    // Get parents
-    const parents = findParentsOfPerson(personId);
+
     if (parentsContainer) {
-        if (parents.length > 0) {
-            parentsContainer.innerHTML = parents.map(parent => 
-                `<div class="family-member-item" onclick="openProfileSidebar(${parent.id})">${parent.name}</div>`
-            ).join('');
-        } else {
-            parentsContainer.innerHTML = '<div class="family-member-item empty">No parents</div>';
-        }
+        parentsContainer.innerHTML = renderFamilyListItems(findParentsOfPerson(personId), 'No parents');
     }
-    
-    // Get children
-    const children = getChildrenOfPerson(personId);
     if (childrenContainer) {
-        if (children.length > 0) {
-            childrenContainer.innerHTML = children.map(child => 
-                `<div class="family-member-item" onclick="openProfileSidebar(${child.id})">${child.name}</div>`
-            ).join('');
-        } else {
-            childrenContainer.innerHTML = '<div class="family-member-item empty">No children</div>';
-        }
+        childrenContainer.innerHTML = renderFamilyListItems(getChildrenOfPerson(personId), 'No children');
     }
-    
-    // Get grandchildren
-    const grandchildren = getGrandchildrenOfPerson(personId);
     if (grandchildrenContainer) {
-        if (grandchildren.length > 0) {
-            grandchildrenContainer.innerHTML = grandchildren.map(grandchild => 
-                `<div class="family-member-item" onclick="openProfileSidebar(${grandchild.id})">${grandchild.name}</div>`
-            ).join('');
-        } else {
-            grandchildrenContainer.innerHTML = '<div class="family-member-item empty">No grandchildren</div>';
-        }
+        grandchildrenContainer.innerHTML = renderFamilyListItems(getGrandchildrenOfPerson(personId), 'No grandchildren');
     }
 }
 
 function closeProfileSidebar() {
     const profileSidebar = document.getElementById('profileSidebar');
-    profileSidebar.classList.remove('active');
+    if (profileSidebar) profileSidebar.classList.remove('active');
 }
 
 function saveProfileFromSidebar() {
     const form = document.getElementById('profileEditForm');
-    const personId = parseInt(form.dataset.personId);
-    if (!personId) return;
+    if (!form) return;
+    const personId = parseInt(form.dataset.personId, 10);
+    if (!personId || isNaN(personId)) {
+        showToast('No member selected. Please open a profile first.', 'error');
+        return;
+    }
 
     const person = findPersonById(personId);
-    if (!person) return;
+    if (!person) {
+        showToast('Member not found. The data may have changed.', 'error');
+        return;
+    }
 
-    const firstName = document.getElementById('profileFirstName').value.trim();
-    const lastName = document.getElementById('profileLastName').value.trim();
+    const firstName = (document.getElementById('profileFirstName')?.value || '').trim();
+    const lastName = (document.getElementById('profileLastName')?.value || '').trim();
+    const fullName = joinName(firstName, lastName);
+    if (!fullName) {
+        showToast('Please enter a first or last name.', 'error');
+        return;
+    }
     const birthday = document.getElementById('profileBirthday').value.trim();
     const gender = document.getElementById('profileGender').value;
     const biography = document.getElementById('profileBiography').value.trim();
@@ -2249,7 +2373,7 @@ function saveProfileFromSidebar() {
     const passedOn = document.getElementById('profilePassedOn')?.checked || false;
 
     // Update person data
-    person.name = joinName(firstName, lastName);
+    person.name = fullName;
     person.birthday = birthday;
     person.gender = gender;
     person.biography = biography;
@@ -2269,89 +2393,112 @@ function saveProfileFromSidebar() {
     showToast('Profile updated successfully!', 'success');
     // Don't close sidebar - keep it open so user can see the changes
     // Refresh the sidebar to show updated data
-    setTimeout(() => openProfileSidebar(personId), 100);
+    setTimeout(() => openProfileSidebar(personId), SIDEBAR_REOPEN_DELAY_MS);
 }
 
 // Save Member
 function saveMember() {
     const form = document.getElementById('memberForm');
-    const name = document.getElementById('name').value;
-    const age = parseInt(document.getElementById('age').value) || 0;
-    const gender = document.getElementById('gender').value;
-    const photo = document.getElementById('photo').value;
-    const relationshipStatus = document.getElementById('relationshipStatus').value || 'single';
-    const passedOn = document.getElementById('passedOn').checked || false;
+    if (!form) return;
+    const nameInput = document.getElementById('name');
+    const name = (nameInput?.value || '').trim();
+    if (!name) {
+        showToast('Please enter a name.', 'error');
+        if (nameInput) nameInput.focus();
+        return;
+    }
+    const age = parseInt(document.getElementById('age')?.value, 10) || 0;
+    const gender = (document.getElementById('gender')?.value) || 'male';
+    const rawPhoto = (document.getElementById('photo')?.value || '').trim();
+    const photo = rawPhoto ? sanitizePhotoUrl(rawPhoto) || null : null;
+    const relationshipStatus = (document.getElementById('relationshipStatus')?.value) || 'single';
+    const passedOn = document.getElementById('passedOn')?.checked || false;
 
     if (form.dataset.editId) {
         // Edit existing person
-        const person = findPersonById(parseInt(form.dataset.editId));
-        if (person) {
-            person.name = name;
-            person.age = age;
-            person.gender = gender;
-            person.photo = photo || null;
-            person.relationshipStatus = relationshipStatus;
-            person.passedOn = passedOn;
-            showToast('Member updated successfully!', 'success');
+        const editId = parseInt(form.dataset.editId, 10);
+        if (isNaN(editId)) {
+            showToast('Invalid member. Please try again.', 'error');
+            return;
         }
+        const person = findPersonById(editId);
+        if (!person) {
+            showToast('Member not found. The data may have changed.', 'error');
+            return;
+        }
+        person.name = name;
+        person.age = age;
+        person.gender = gender;
+        person.photo = photo;
+        person.relationshipStatus = relationshipStatus;
+        person.passedOn = passedOn;
+        showToast('Member updated successfully!', 'success');
     } else if (form.dataset.relation === 'child' && form.dataset.parentId) {
         // Add child
-        const parentId = parseInt(form.dataset.parentId);
-        const location = findGenerationAndCoupleIndex(parentId);
-        if (location) {
-            const newId = Math.max(...getAllPeople().map(p => p.id), 0) + 1;
-            const newChild = {
-                id: newId,
-                name: name,
-                age: age,
-                gender: gender,
-                photo: photo || null,
-                relationshipStatus,
-                passedOn
-            };
-            
-            // Add child to parent's children array
-            location.couple.children = location.couple.children || [];
-            location.couple.children.push(newId);
-            
-            // Add child to next generation
-            const nextGenIndex = location.genIndex + 1;
-            if (nextGenIndex >= familyData.generations.length) {
-                // Create new generation if needed
-                familyData.generations.push({ couples: [] });
-            }
-            
-            const nextGen = familyData.generations[nextGenIndex];
-            nextGen.couples.push({
-                people: [newChild],
-                children: []
-            });
-            showToast('Child added successfully!', 'success');
+        const parentId = parseInt(form.dataset.parentId, 10);
+        if (isNaN(parentId)) {
+            showToast('Invalid parent. Please try again.', 'error');
+            return;
         }
+        const location = findGenerationAndCoupleIndex(parentId);
+        if (!location) {
+            showToast('Could not find parent in family tree. Please try again.', 'error');
+            return;
+        }
+        const newId = getNextPersonId();
+        const newChild = {
+            id: newId,
+            name: name,
+            age: age,
+            gender: gender,
+            photo: photo,
+            relationshipStatus,
+            passedOn
+        };
+        location.couple.children = location.couple.children || [];
+        location.couple.children.push(newId);
+        const nextGenIndex = location.genIndex + 1;
+        if (nextGenIndex >= familyData.generations.length) {
+            familyData.generations.push({ couples: [] });
+        }
+        const nextGen = familyData.generations[nextGenIndex];
+        nextGen.couples.push({
+            people: [newChild],
+            children: []
+        });
+        showToast('Child added successfully!', 'success');
     } else if (form.dataset.relation === 'spouse' && form.dataset.personId) {
         // Add spouse
-        const personId = parseInt(form.dataset.personId);
-        const location = findGenerationAndCoupleIndex(personId);
-        if (location) {
-            const newId = Math.max(...getAllPeople().map(p => p.id), 0) + 1;
-            const newSpouse = {
-                id: newId,
-                name: name,
-                age: age,
-                gender: gender,
-                photo: photo || null,
-                relationshipStatus,
-                passedOn
-            };
-            
-            // Add spouse to the same couple
-            location.couple.people.push(newSpouse);
-            showToast('Spouse added successfully!', 'success');
+        const personId = parseInt(form.dataset.personId, 10);
+        if (isNaN(personId)) {
+            showToast('Invalid person. Please try again.', 'error');
+            return;
         }
+        const location = findGenerationAndCoupleIndex(personId);
+        if (!location) {
+            showToast('Could not find person in family tree. Please try again.', 'error');
+            return;
+        }
+        const newId = getNextPersonId();
+        const newSpouse = {
+            id: newId,
+            name: name,
+            age: age,
+            gender: gender,
+            photo: photo,
+            relationshipStatus,
+            passedOn
+        };
+        location.couple.people.push(newSpouse);
+        showToast('Spouse added successfully!', 'success');
     } else {
         // Add new person (simplified - add to last generation)
         const lastGen = familyData.generations[familyData.generations.length - 1];
-        const newId = Math.max(...getAllPeople().map(p => p.id), 0) + 1;
+        if (!lastGen) {
+            showToast('Family tree structure is invalid. Please refresh the page.', 'error');
+            return;
+        }
+        const newId = getNextPersonId();
         
         lastGen.couples.push({
             people: [{
@@ -2369,25 +2516,13 @@ function saveMember() {
     }
 
     saveData();
-    renderTree();
-    renderPhotoGallery();
+    refreshUI();
     closeModal();
     
     // Reopen profile sidebar if it was open
     if (form.dataset.parentId || form.dataset.personId) {
         const personId = parseInt(form.dataset.parentId || form.dataset.personId);
-        setTimeout(() => openProfileSidebar(personId), 100);
+        setTimeout(() => openProfileSidebar(personId), SIDEBAR_REOPEN_DELAY_MS);
     }
 }
 
-// Add some additional sample photos for variety
-const samplePhotos = [
-    "https://randomuser.me/api/portraits/men/1.jpg",
-    "https://randomuser.me/api/portraits/women/1.jpg",
-    "https://randomuser.me/api/portraits/women/32.jpg",
-    "https://randomuser.me/api/portraits/men/32.jpg",
-    "https://randomuser.me/api/portraits/women/65.jpg",
-    "https://randomuser.me/api/portraits/men/22.jpg",
-    "https://randomuser.me/api/portraits/men/45.jpg",
-    "https://randomuser.me/api/portraits/women/44.jpg"
-];
