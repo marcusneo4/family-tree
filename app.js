@@ -4,7 +4,7 @@
 'use strict';
 
 const SETTINGS_KEY = 'familyTreeSettings';
-const DEFAULT_SETTINGS = { meId: null, meSkipped: false, theme: 'auto', showPhotos: false, view: 'family', quizBest: 0 };
+const DEFAULT_SETTINGS = { meId: null, meSkipped: false, theme: 'auto', showPhotos: true, view: 'family', quizBest: 0 };
 
 const state = {
     view: 'family',
@@ -28,6 +28,8 @@ function loadSettings() {
     try {
         const raw = localStorage.getItem(SETTINGS_KEY);
         if (raw) Object.assign(state.settings, JSON.parse(raw));
+        // Photos are now on by default; switch them on once for anyone who saved the old default.
+        if (!state.settings.photosV2) { state.settings.showPhotos = true; state.settings.photosV2 = true; }
         else if (localStorage.getItem('darkMode') === 'true') state.settings.theme = 'dark'; // from the old app
     } catch (err) { /* private mode or corrupt value: keep defaults */ }
 }
@@ -41,7 +43,7 @@ function applyTheme() {
     document.documentElement.dataset.theme = theme;
     const dark = theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     const meta = $('meta[name="theme-color"]');
-    if (meta) meta.content = dark ? '#121715' : '#EEF1EC';
+    if (meta) meta.content = dark ? '#141A16' : '#F2F4EC';
 }
 
 /* ---------- Icons (inline, so the app works offline) ---------- */
@@ -86,14 +88,33 @@ function icon(name) {
 
 /* ---------- Small view helpers ---------- */
 
+/* ---------- Branch colours ---------- */
+
+let branchCache = null;
+function branchIndexOf(id) {
+    if (!branchCache) {
+        branchCache = new Map();
+        getBranches().forEach((b, i) => b.ids.forEach(pid => branchCache.set(pid, i % BRANCH_COUNT)));
+    }
+    return branchCache.has(id) ? branchCache.get(id) : -1;
+}
+function branchVar(index) { return index < 0 ? 'var(--gold)' : `var(--b${index})`; }
+function personColor(person) { return branchVar(branchIndexOf(person.id)); }
+
+function framedImg(photo, focus, alt = '', extra = '') {
+    const style = photoFrameStyle(focus);
+    return `<img src="${escapeHtml(photo)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async"${style ? ` class="is-framed" style="${style}"` : ''}${extra}>`;
+}
+
 function avatar(person, size = 'md') {
     const cls = `avatar avatar-${size}${person.passedOn ? ' is-past' : ''}`;
     const initials = escapeHtml(getInitials(person.name));
     const photo = sanitizePhotoUrl(person.photo);
+    const ring = person.id !== undefined ? ` style="--ring:${personColor(person)}"` : '';
     if (state.settings.showPhotos && photo) {
-        return `<span class="${cls}"><img src="${escapeHtml(photo)}" alt="" loading="lazy" decoding="async" data-initials="${initials}"></span>`;
+        return `<span class="${cls}"${ring}>${framedImg(photo, photoFocusFor(person), '', ` data-initials="${initials}"`)}</span>`;
     }
-    return `<span class="${cls}"><span class="avatar-initials" aria-hidden="true">${initials}</span></span>`;
+    return `<span class="${cls}"${ring}><span class="avatar-initials" aria-hidden="true">${initials}</span></span>`;
 }
 
 // A photo that fails to load falls back to initials instead of a broken-image icon.
@@ -175,7 +196,7 @@ function persist() {
     return result.ok;
 }
 
-function markAllDirty() { ['family', 'people', 'tree'].forEach(v => state.dirty.add(v)); }
+function markAllDirty() { branchCache = null; ['family', 'people', 'tree'].forEach(v => state.dirty.add(v)); }
 
 /**
  * Run a change to the family data with undo.
@@ -296,7 +317,7 @@ function defaultFocusId() {
 
 function tile(person, subOverride) {
     const sub = subOverride !== undefined ? subOverride : (relationLine(person) || getLifeSummary(person));
-    return `<button type="button" class="tile${person.passedOn ? ' is-past' : ''}" data-focus="${person.id}">
+    return `<button type="button" class="tile${person.passedOn ? ' is-past' : ''}" style="--c:${personColor(person)}" data-focus="${person.id}">
         ${avatar(person, 'md')}
         <span class="tile-name">${displayName(person)}</span>
         ${sub ? `<span class="tile-sub">${escapeHtml(sub)}</span>` : ''}
@@ -339,7 +360,10 @@ function renderFamily() {
         html += `<section class="group" aria-labelledby="g-parents"><h2 id="g-parents" class="group-title">Parents</h2><div class="tiles">${parents.map(x => tile(x)).join('')}</div></section>`;
     }
 
-    html += `<article class="focus-card${p.passedOn ? ' is-past' : ''}" aria-labelledby="focus-name">
+    const branch = branchIndexOf(p.id);
+    const branchName = branch >= 0 ? getBranches()[branch] : null;
+    html += `<article class="focus-card${p.passedOn ? ' is-past' : ''}" style="--c:${personColor(p)}" aria-labelledby="focus-name">
+        <p class="focus-branch"><span class="chip-dot" aria-hidden="true"></span>${branch >= 0 && branchName ? `${escapeHtml(branchName.label)}’s branch` : 'Founders of the family'}</p>
         <div class="focus-top">
             ${avatar(p, 'xl')}
             <div class="focus-id">
@@ -450,66 +474,248 @@ function countBelow(couple) {
     return getDescendantCouples(couple).reduce((n, c) => n + c.people.length, 0);
 }
 
-function treeCard(person, bloodline) {
-    const life = getLifeSummary(person);
-    return `<button type="button" class="t-card${person.passedOn ? ' is-past' : ''}${bloodline.has(person.id) ? ' is-blood' : ''}" data-act="open" data-id="${person.id}">
-        ${avatar(person, 'sm')}
-        <span class="t-name">${displayName(person)}</span>
-        ${life ? `<span class="t-sub">${escapeHtml(life)}</span>` : ''}
+/* The tree is drawn like a real tree: founders at the root, each child's family a coloured limb,
+   generations growing upward. Layout is computed here; limbs and leaves are SVG, people are buttons on top. */
+
+const TREE = { slot: 96, gap: 22, row: 232, pad: 90, ground: 210 };
+
+/** Tiny seeded random so leaves stay put between renders. */
+function seeded(key) {
+    let h = 2166136261;
+    for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+}
+
+function layoutTree(root) {
+    const all = [];
+    const measure = (couple, depth, parent) => {
+        const key = coupleKey(couple);
+        const kids = getChildCouples(couple);
+        const folded = state.collapsed.has(key);
+        const n = { couple, key, depth, parent, w: couple.people.length * TREE.slot, kids: [], hasKids: kids.length > 0, folded, size: couple.people.length + countBelow(couple) };
+        n.branch = branchIndexOf(couple.people[0].id);
+        if (!folded) n.kids = kids.map(k => measure(k, depth + 1, n));
+        n.kidsW = n.kids.reduce((s, k) => s + k.sw, 0) + Math.max(0, n.kids.length - 1) * TREE.gap;
+        n.sw = Math.max(n.w + (folded && n.hasKids ? 20 : 0), n.kidsW);
+        all.push(n);
+        return n;
+    };
+    const place = (n, left) => {
+        let cursor = left + (n.sw - n.kidsW) / 2;
+        n.kids.forEach(k => { place(k, cursor); cursor += k.sw + TREE.gap; });
+        n.x = n.kids.length ? (n.kids[0].x + n.kids[n.kids.length - 1].x) / 2 : left + n.sw / 2;
+    };
+    const top = measure(root, 0, null);
+    place(top, 0);
+    // Heights: each generation one row up; outer limbs droop a little so the canopy reads as a dome.
+    const setY = n => {
+        if (!n.parent) n.y = 0;
+        else if (!n.parent.parent && n.parent.kids.length > 3) {
+            // First limbs off the trunk rise into a wide crown: tall in the middle, lower at the edges.
+            const half = Math.max(1, (n.parent.kids[n.parent.kids.length - 1].x - n.parent.kids[0].x) / 2);
+            const h = Math.max(TREE.row * 1.2, half * 0.42);
+            const t = (n.x - n.parent.x) / half;
+            n.y = n.parent.y - h + t * t * h * 0.5;
+        } else n.y = n.parent.y - TREE.row + Math.min(46, Math.abs(n.x - n.parent.x) * 0.045);
+        n.kids.forEach(setY);
+    };
+    setY(top);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity;
+    all.forEach(n => { minX = Math.min(minX, n.x - n.w / 2); maxX = Math.max(maxX, n.x + n.w / 2); minY = Math.min(minY, n.y); });
+    minX = Math.min(minX, top.x - 260); maxX = Math.max(maxX, top.x + 260);
+    const dx = TREE.pad - minX, dy = TREE.pad + 70 - minY;
+    all.forEach(n => { n.x += dx; n.y += dy; });
+    const maxDepth = all.reduce((m, n) => Math.max(m, n.depth), 0);
+    return { root: top, nodes: all, width: maxX - minX + TREE.pad * 2, height: top.y + TREE.ground, maxDepth };
+}
+
+function cubicAt(p, t) {
+    const u = 1 - t;
+    const x = u * u * u * p[0][0] + 3 * u * u * t * p[1][0] + 3 * u * t * t * p[2][0] + t * t * t * p[3][0];
+    const y = u * u * u * p[0][1] + 3 * u * u * t * p[1][1] + 3 * u * t * t * p[2][1] + t * t * t * p[3][1];
+    const dxt = 3 * u * u * (p[1][0] - p[0][0]) + 6 * u * t * (p[2][0] - p[1][0]) + 3 * t * t * (p[3][0] - p[2][0]);
+    const dyt = 3 * u * u * (p[1][1] - p[0][1]) + 6 * u * t * (p[2][1] - p[1][1]) + 3 * t * t * (p[3][1] - p[2][1]);
+    return { x, y, a: Math.atan2(dyt, dxt) };
+}
+
+/** A limb: a filled shape that tapers from w0 to w1 along a cubic curve. */
+function limbPath(p, w0, w1) {
+    const left = [], right = [];
+    const steps = 18;
+    for (let i = 0; i <= steps; i++) {
+        const t = i / steps, pt = cubicAt(p, t);
+        const w = (w0 + (w1 - w0) * Math.pow(t, 0.75)) / 2;
+        const nx = -Math.sin(pt.a), ny = Math.cos(pt.a);
+        left.push(`${(pt.x + nx * w).toFixed(1)} ${(pt.y + ny * w).toFixed(1)}`);
+        right.push(`${(pt.x - nx * w).toFixed(1)} ${(pt.y - ny * w).toFixed(1)}`);
+    }
+    return `M${left.join('L')}L${right.reverse().join('L')}Z`;
+}
+
+function leafShape(x, y, angle, size, fill, opacity) {
+    const s = size;
+    return `<path d="M0 0C${s * 0.3} ${-s * 0.42} ${s * 0.78} ${-s * 0.36} ${s} 0C${s * 0.78} ${s * 0.36} ${s * 0.3} ${s * 0.42} 0 0Z" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${(angle * 180 / Math.PI).toFixed(1)})" style="fill:${fill}" opacity="${opacity.toFixed(2)}"/>`;
+}
+
+function limbWidth(size) { return 4 + 2.6 * Math.sqrt(size); }
+
+function leafTint(color, rnd) {
+    const r = rnd();
+    if (r < 0.34) return `color-mix(in oklab, ${color} 62%, #fff)`;
+    if (r < 0.62) return `color-mix(in oklab, ${color} 78%, var(--leaf))`;
+    return color;
+}
+
+function drawTreeSvg(layout, scoped) {
+    const { root, nodes, width, height } = layout;
+    const limbs = [], leaves = [], defs = [];
+    const groundY = root.y + 120;
+    const trunkColor = scoped ? branchVar(root.branch) : 'var(--bark)';
+    const trunkW = scoped ? limbWidth(root.size) + 8 : 54;
+
+    // Ground, roots and trunk.
+    const gx = root.x;
+    limbs.push(`<path class="t-ground" d="M${gx - 420} ${groundY + 46}C${gx - 250} ${groundY - 8} ${gx + 250} ${groundY - 8} ${gx + 420} ${groundY + 46}Z"/>`);
+    [-1, 1].forEach(side => [0.55, 1].forEach(k => {
+        limbs.push(`<path d="${limbPath([[gx + side * 6, groundY - 10], [gx + side * 30 * k, groundY + 6], [gx + side * 70 * k, groundY + 10], [gx + side * 120 * k, groundY + 26 * k]], trunkW * 0.42, 3)}" style="fill:${trunkColor}"/>`);
+    }));
+    const fork = [root.x, root.y - TREE.row * 0.4];
+    limbs.push(`<path d="${limbPath([[gx, groundY], [gx - 6, groundY - 60], [gx + 8, root.y], [fork[0], fork[1]]], trunkW, trunkW * 0.62)}" style="fill:${trunkColor}"/>`);
+
+    nodes.forEach(n => {
+        const rnd = seeded(n.key);
+        const start = n === root ? fork : [n.x, n.y - TREE.row * 0.4];
+        if (n !== root && n.kids.length) {
+            const w = limbWidth(n.size);
+            limbs.push(`<path d="${limbPath([[n.x, n.y + 10], [n.x, n.y - 30], [n.x, start[1] + 30], start], w, w * 0.85)}" style="fill:${branchVar(n.branch)}"/>`);
+        }
+        n.kids.forEach((k, i) => {
+            const color = branchVar(k.branch);
+            const ddx = k.x - start[0], hh = Math.max(60, start[1] - k.y);
+            const p = [start, [start[0] + ddx * 0.28, start[1] - hh * 0.5], [k.x - ddx * 0.06, k.y + hh * 0.42], [k.x, k.y + 6]];
+            const w0 = n === root ? Math.min(trunkW * 0.55, limbWidth(k.size) + 6) : limbWidth(k.size);
+            let fill = color;
+            if (n === root && !scoped) {
+                const id = `lg-${k.key.replace(/[^a-z0-9]/gi, '')}`;
+                defs.push(`<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${start[0]}" y1="${start[1]}" x2="${k.x}" y2="${k.y}"><stop offset="0" style="stop-color:var(--bark)"/><stop offset="0.55" style="stop-color:${color}"/></linearGradient>`);
+                fill = `url(#${id})`;
+            }
+            limbs.push(`<path d="${limbPath(p, w0, Math.max(3, w0 * 0.45))}" style="fill:${fill}"/>`);
+            const count = 4 + Math.floor(rnd() * 4);
+            for (let j = 0; j < count; j++) {
+                const t = 0.32 + rnd() * 0.55;
+                const pt = cubicAt(p, t);
+                const side = (j + i) % 2 ? 1 : -1;
+                leaves.push(leafShape(pt.x, pt.y, pt.a + side * (0.7 + rnd() * 0.6), 15 + rnd() * 12, leafTint(color, rnd), 0.7 + rnd() * 0.3));
+            }
+        });
+        // A crown of leaves over the youngest families and folded ones.
+        if (!n.kids.length && n !== root) {
+            const color = branchVar(n.branch);
+            const count = n.folded ? 9 : 6;
+            for (let j = 0; j < count; j++) {
+                const a = -Math.PI / 2 + (j / (count - 1) - 0.5) * 2.4 + (rnd() - 0.5) * 0.3;
+                const r = n.w / 2 + 2 + rnd() * 10;
+                leaves.push(leafShape(n.x + Math.cos(a) * r * 0.9, n.y - 30 + Math.sin(a) * 34, a + (rnd() - 0.5) * 0.6, 14 + rnd() * 9, leafTint(color, rnd), 0.6 + rnd() * 0.35));
+            }
+        }
+    });
+    return `<svg class="t-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true"><defs>${defs.join('')}</defs>${limbs.join('')}${leaves.join('')}</svg>`;
+}
+
+function treePerson(person, bloodline) {
+    return `<button type="button" class="tp${person.passedOn ? ' is-past' : ''}" data-act="open" data-id="${person.id}">
+        ${avatar(person, 'tree')}
+        ${bloodline.has(person.id) ? '<span class="tp-seal" aria-hidden="true">孙</span>' : ''}
+        <span class="tp-name">${displayName(person)}</span>
     </button>`;
 }
 
-function treeNode(couple, bloodline) {
-    const key = coupleKey(couple);
-    const kids = getChildCouples(couple);
-    const folded = state.collapsed.has(key);
-    let html = `<div class="t-node"><div class="t-couple${couple.people.length > 1 ? ' is-pair' : ''}">${couple.people.map(p => treeCard(p, bloodline)).join('')}</div>`;
-    if (kids.length) {
-        const label = `${folded ? 'Show' : 'Hide'} ${countBelow(couple)} below ${couple.people.map(p => p.name).join(' and ')}`;
-        html += `<button type="button" class="t-fold${folded ? ' is-folded' : ''}" data-fold="${escapeHtml(key)}" aria-expanded="${!folded}" aria-label="${escapeHtml(label)}">${folded ? `+${countBelow(couple)}` : icon('minus')}</button>`;
-        if (!folded) html += `<div class="t-children">${kids.map(c => `<div class="t-branch">${treeNode(c, bloodline)}</div>`).join('')}</div>`;
-    }
-    return html + '</div>';
+function drawTreeNodes(layout, bloodline) {
+    const genNames = ['第一代', '第二代', '第三代', '第四代', '第五代', '第六代'];
+    const offset = state.treeScope === 'all' ? 0 : 1;
+    let html = '';
+    const rows = new Map();
+    layout.nodes.forEach(n => { if (!rows.has(n.depth)) rows.set(n.depth, n.y); else rows.set(n.depth, Math.min(rows.get(n.depth), n.y)); });
+    rows.forEach((y, depth) => {
+        const g = depth + offset;
+        html += `<div class="t-gen" style="top:${y - 18}px"><span lang="zh-Hans">${genNames[g] || ''}</span> Generation ${g + 1}</div>`;
+    });
+    layout.nodes.forEach(n => {
+        const color = branchVar(n.branch);
+        const cls = `tn${n === layout.root ? ' is-root' : ''}${n.couple.people.length > 1 ? ' is-pair' : ''}`;
+        html += `<div class="${cls}" style="left:${n.x}px;top:${n.y}px;--c:${color};--d:${n.depth}">${n.couple.people.map(p => treePerson(p, bloodline)).join(n.couple.people.length > 1 ? '<span class="tn-knot" aria-hidden="true"></span>' : '')}</div>`;
+        if (n.hasKids) {
+            const names = n.couple.people.map(p => p.name).join(' and ');
+            if (n.folded) {
+                const count = countBelow(n.couple);
+                html += `<button type="button" class="t-bud" style="left:${n.x}px;top:${n.y - 78}px;--c:${color};--d:${n.depth + 1}" data-fold="${escapeHtml(n.key)}" aria-expanded="false" aria-label="${escapeHtml(`Show ${count} below ${names}`)}">+${count}</button>`;
+            } else if (n !== layout.root || state.treeScope !== 'all') {
+                html += `<button type="button" class="t-knot" style="left:${n.x}px;top:${n.y - TREE.row * 0.4}px;--c:${color}" data-fold="${escapeHtml(n.key)}" aria-expanded="true" aria-label="${escapeHtml(`Fold the branch below ${names}`)}">${icon('minus')}</button>`;
+            }
+        }
+    });
+    return html;
 }
 
 function initCollapsedFor(scope) {
     state.collapsed = new Set();
     if (scope !== 'all') return;
-    // Show the founders and their children; fold everything further down.
+    // Show the founders and their children; fold everything further up.
     getTreeRoots().forEach(root => getChildCouples(root).forEach(c => {
         if (getChildCouples(c).length) state.collapsed.add(coupleKey(c));
     }));
 }
 
 function renderTreeChips() {
-    const chips = [{ key: 'all', label: 'Everyone' }].concat(getBranches().map(b => ({ key: b.key, label: b.label })));
+    const chips = [{ key: 'all', label: 'Whole tree', color: 'var(--bark)' }].concat(getBranches().map((b, i) => ({ key: b.key, label: b.label, color: branchVar(i % BRANCH_COUNT) })));
     $('#treeChips').innerHTML = chips.map(c =>
-        `<button type="button" class="chip${state.treeScope === c.key ? ' is-active' : ''}" data-tree-scope="${escapeHtml(c.key)}" aria-pressed="${state.treeScope === c.key}">${escapeHtml(c.label)}</button>`).join('');
+        `<button type="button" class="chip chip-branch${state.treeScope === c.key ? ' is-active' : ''}" style="--c:${c.color}" data-tree-scope="${escapeHtml(c.key)}" aria-pressed="${state.treeScope === c.key}"><span class="chip-dot" aria-hidden="true"></span>${escapeHtml(c.label)}</button>`).join('');
 }
+
+let treeLayout = null;
 
 function buildTreeHtml() {
     const bloodline = computeBloodlineIdSet();
-    let roots = getTreeRoots();
+    let root = getTreeRoots()[0];
     let from = '';
     if (state.treeScope !== 'all') {
         const branch = getBranches().find(b => b.key === state.treeScope);
         if (branch) {
-            roots = [branch.couple];
+            root = branch.couple;
             const parents = getParentCouple(branch.link.id);
-            if (parents) from = `<p class="t-from">Children of ${parents.people.map(p => displayName(p)).join(' and ')}</p>`;
+            if (parents) from = `Children of ${parents.people.map(p => displayName(p)).join(' and ')}`;
         } else {
             state.treeScope = 'all';
         }
     }
-    return from + roots.map(r => treeNode(r, bloodline)).join('');
+    if (!root) { treeLayout = null; return { html: '<p class="empty">No one is in the tree yet.</p>', from: '' }; }
+    treeLayout = layoutTree(root);
+    const html = drawTreeSvg(treeLayout, state.treeScope !== 'all') + drawTreeNodes(treeLayout, bloodline);
+    return { html, from };
 }
 
 /** @param {boolean} [keepView] keep the current pan and zoom (used when folding a branch) */
 function renderTree(keepView = false) {
     renderTreeChips();
-    $('#treeCanvas').innerHTML = buildTreeHtml();
-    if (keepView) applyTreeTransform();
-    else requestAnimationFrame(fitTree);
+    const canvas = $('#treeCanvas');
+    const prevRoot = keepView && treeLayout ? { x: treeLayout.root.x, y: treeLayout.root.y } : null;
+    const { html, from } = buildTreeHtml();
+    canvas.innerHTML = html;
+    if (treeLayout) { canvas.style.width = `${treeLayout.width}px`; canvas.style.height = `${treeLayout.height}px`; }
+    const fromEl = $('#treeFrom');
+    if (fromEl) { fromEl.innerHTML = from; fromEl.hidden = !from; }
+    if (keepView && prevRoot && treeLayout) {
+        // Keep the trunk where it was on screen.
+        tv.x += (prevRoot.x - treeLayout.root.x) * tv.scale;
+        tv.y += (prevRoot.y - treeLayout.root.y) * tv.scale;
+        applyTreeTransform();
+    } else {
+        canvas.classList.add('is-growing');
+        clearTimeout(renderTree.growTimer);
+        renderTree.growTimer = setTimeout(() => canvas.classList.remove('is-growing'), 1600);
+        requestAnimationFrame(fitTree);
+    }
 }
 
 function applyTreeTransform() {
@@ -518,19 +724,15 @@ function applyTreeTransform() {
 }
 
 function fitTree() {
-    const stage = $('#treeStage'), canvas = $('#treeCanvas');
-    if (!stage || !canvas || !stage.clientWidth) return;
-    canvas.style.transform = 'none';
-    const w = canvas.offsetWidth, h = canvas.offsetHeight;
+    const stage = $('#treeStage');
+    if (!stage || !treeLayout || !stage.clientWidth) return;
+    const w = treeLayout.width, h = treeLayout.height;
     const sw = stage.clientWidth, sh = stage.clientHeight;
-    const fit = Math.min(1, (sw - 24) / w, (sh - 24) / h);
-    tv.scale = Math.max(fit, state.treeScope === 'all' ? 0.45 : 0.35);
-    const firstCouple = canvas.querySelector('.t-couple');
-    let centreX = w / 2;
-    if (firstCouple) centreX = firstCouple.offsetLeft + firstCouple.offsetWidth / 2;
-    const scaledW = w * tv.scale;
-    tv.x = scaledW <= sw ? (sw - scaledW) / 2 : sw / 2 - centreX * tv.scale;
-    tv.y = 12;
+    const fit = Math.min(1, sw / w, sh / h);
+    tv.scale = Math.max(fit, sw < 600 ? 0.36 : 0.5);
+    const scaledW = w * tv.scale, scaledH = h * tv.scale;
+    tv.x = scaledW <= sw ? (sw - scaledW) / 2 : sw / 2 - treeLayout.root.x * tv.scale;
+    tv.y = scaledH <= sh ? (sh - scaledH) / 2 : sh - scaledH;
     applyTreeTransform();
 }
 
@@ -810,6 +1012,7 @@ function openEdit(ctx) {
         if (!person) return;
         title = `Edit ${escapeHtml(person.name)}`;
         editCtx.photo = person.photo || null;
+        editCtx.photoFocus = person.photoFocus || null;
     } else if (ctx.mode === 'child') {
         const parent = findPersonById(ctx.parentId);
         if (!parent) return;
@@ -869,11 +1072,21 @@ function openEdit(ctx) {
     if (nameInput && !isEdit) nameInput.focus();
 }
 
+function editFocus() {
+    return photoFocusFor({ photo: editCtx.photo, photoFocus: editCtx.photoFocus });
+}
+
 function editPhotoPreview(person) {
-    const draft = Object.assign({}, person, { photo: editCtx ? editCtx.photo : person.photo });
-    const photo = sanitizePhotoUrl(draft.photo);
-    if (photo) return `<span class="avatar avatar-xl"><img src="${escapeHtml(photo)}" alt="Current photo" data-initials="${escapeHtml(getInitials(draft.name))}"></span>`;
-    return `<span class="avatar avatar-xl"><span class="avatar-initials" aria-hidden="true">${escapeHtml(getInitials(draft.name || ''))}</span></span>`;
+    const photo = sanitizePhotoUrl(editCtx ? editCtx.photo : person.photo);
+    if (photo) {
+        const f = editFocus();
+        return `<div class="photo-adjust">
+            <span class="avatar avatar-adjust" id="photoFrame" title="Drag to centre the face">${framedImg(photo, f, 'Current photo')}</span>
+            <label class="zoom-row"><span>Zoom</span><input type="range" id="f-zoom" min="1" max="3" step="0.05" value="${f ? f.z : 1}" aria-label="Zoom the photo"></label>
+            <p class="hint">Drag the photo to centre the face.</p>
+        </div>`;
+    }
+    return `<span class="avatar avatar-adjust"><span class="avatar-initials" aria-hidden="true">${escapeHtml(getInitials(person.name || ''))}</span></span>`;
 }
 
 function refreshEditPhoto() {
@@ -881,6 +1094,44 @@ function refreshEditPhoto() {
     if (host) host.innerHTML = editPhotoPreview({ name: ($('#f-name') || {}).value || '' });
     const clear = $('#clearPhotoBtn');
     if (clear) clear.hidden = !editCtx.photo;
+}
+
+function applyEditFocus() {
+    const img = $('#photoFrame img');
+    if (!img) return;
+    img.setAttribute('style', photoFrameStyle(editFocus()));
+    img.className = 'is-framed';
+}
+
+/** Drag inside the round preview to move the face to the centre; the slider zooms. */
+function setupPhotoAdjust() {
+    let drag = null;
+    document.addEventListener('pointerdown', ev => {
+        const frame = ev.target.closest && ev.target.closest('#photoFrame');
+        if (!frame || !editCtx) return;
+        ev.preventDefault();
+        const f = editFocus();
+        drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, f: Object.assign({}, f), size: frame.clientWidth };
+        frame.setPointerCapture(ev.pointerId);
+    });
+    document.addEventListener('pointermove', ev => {
+        if (!drag || ev.pointerId !== drag.id) return;
+        const f = drag.f, a = f.a || 1;
+        const W = a < 1 ? f.z : f.z * a, H = a < 1 ? f.z / a : f.z;
+        const nx = f.x - (ev.clientX - drag.x) / (W * drag.size) * 100;
+        const ny = f.y - (ev.clientY - drag.y) / (H * drag.size) * 100;
+        editCtx.photoFocus = { x: Math.max(0, Math.min(100, nx)), y: Math.max(0, Math.min(100, ny)), z: f.z };
+        applyEditFocus();
+    });
+    const end = ev => { if (drag && ev.pointerId === drag.id) drag = null; };
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', end);
+    document.addEventListener('input', ev => {
+        if (ev.target.id !== 'f-zoom' || !editCtx) return;
+        const f = editFocus();
+        editCtx.photoFocus = { x: f.x, y: f.y, z: parseFloat(ev.target.value) };
+        applyEditFocus();
+    });
 }
 
 /** Shrink and square-crop a chosen photo so it is small enough to keep on the device. */
@@ -937,6 +1188,7 @@ function saveEdit() {
         passedOn: $('#f-passed').checked,
         deathYear: $('#f-passed').checked ? $('#f-death').value : null,
         photo: editCtx.photo,
+        photoFocus: editCtx.photo ? editCtx.photoFocus : null,
         bio: $('#f-bio').value
     };
     if (statusEl) fields.relationshipStatus = statusEl.value;
@@ -962,7 +1214,7 @@ function openFamilyPhotoPicker() {
         <div class="photo-grid">${FAMILY_PHOTO_FILES.map(file => {
             const path = `Family%20pics/${encodeURIComponent(file)}`;
             const label = file.replace(/\.jpe?g$/i, '');
-            return `<button type="button" class="photo-pick" data-photo="${escapeHtml(path)}" aria-label="${escapeHtml(label)}"><img src="${escapeHtml(path)}" alt="" loading="lazy"><span>${escapeHtml(label)}</span></button>`;
+            return `<button type="button" class="photo-pick" data-photo="${escapeHtml(path)}" aria-label="${escapeHtml(label)}"><span class="pick-frame">${framedImg(path, photoFocusFor({ photo: path }))}</span><span>${escapeHtml(label)}</span></button>`;
         }).join('')}</div></div>`;
     openDialog('photoDlg', html);
 }
@@ -1187,9 +1439,8 @@ function startQuiz() {
 function renderQuizQuestion() {
     const q = quiz.questions[quiz.index];
     if (!q) { renderQuizResults(); return; }
-    const photo = escapeHtml(sanitizePhotoUrl(q.person.photo));
     const html = `<div class="sheet-body quiz">${sheetHead(`Question ${quiz.index + 1} of ${quiz.questions.length}`)}
-        <div class="quiz-photo"><img src="${photo}" alt="Photo of a family member. Choose the matching name."></div>
+        <div class="quiz-photo">${framedImg(sanitizePhotoUrl(q.person.photo), photoFocusFor(q.person), 'Photo of a family member. Choose the matching name.')}</div>
         <div class="quiz-options" role="group" aria-label="Who is this?">${q.options.map(o => `<button type="button" class="btn quiz-option" data-answer="${o.id}">${displayName(o)}</button>`).join('')}</div>
         <p class="quiz-feedback" id="quizFeedback" role="status" aria-live="polite"></p>
         <div class="sheet-actions"><span class="muted">Score ${quiz.score}</span><button type="button" class="btn btn-primary" id="quizNext" hidden data-act="quiz-next">${quiz.index === quiz.questions.length - 1 ? 'See results' : 'Next'}</button></div></div>`;
@@ -1298,7 +1549,7 @@ function handleAction(act, id) {
         case 'reset-data': resetData(); break;
         case 'clear-filters': state.query = ''; state.filter = 'all'; state.branch = 'all'; $('#peopleSearch').value = ''; state.dirty.add('people'); renderCurrent(); break;
         case 'pick-family-photo': openFamilyPhotoPicker(); break;
-        case 'clear-photo': if (editCtx) { editCtx.photo = null; refreshEditPhoto(); } break;
+        case 'clear-photo': if (editCtx) { editCtx.photo = null; editCtx.photoFocus = null; refreshEditPhoto(); } break;
         default: break;
     }
 }
@@ -1336,7 +1587,7 @@ function setupEvents() {
         if (theme) { state.settings.theme = theme.dataset.themeSet; saveSettings(); applyTheme(); openMenu(); return; }
 
         const photo = t.closest('[data-photo]');
-        if (photo && editCtx) { editCtx.photo = photo.dataset.photo; closeDialog('photoDlg'); refreshEditPhoto(); return; }
+        if (photo && editCtx) { editCtx.photo = photo.dataset.photo; editCtx.photoFocus = null; closeDialog('photoDlg'); refreshEditPhoto(); return; }
 
         const answer = t.closest('[data-answer]');
         if (answer) { answerQuiz(parseInt(answer.dataset.answer, 10)); return; }
@@ -1388,7 +1639,7 @@ function setupEvents() {
         if (t.id === 'branchSelect') { state.branch = t.value; state.dirty.add('people'); renderCurrent(); }
         else if (t.id === 'f-passed') { $('#f-death-wrap').hidden = !t.checked; }
         else if (t.id === 'f-photo-file' && t.files && t.files[0]) {
-            try { editCtx.photo = await resizeImage(t.files[0]); refreshEditPhoto(); }
+            try { editCtx.photo = await resizeImage(t.files[0]); editCtx.photoFocus = null; refreshEditPhoto(); }
             catch (err) { showToast(err.message, { type: 'error' }); }
         } else if (t.id === 'importInput' && t.files && t.files[0]) {
             await importBackup(t.files[0]);
@@ -1433,6 +1684,7 @@ function init() {
     const matched = assignPhotosFromFolder();
     if (loaded.reset || matched > 0) persist();
     setupEvents();
+    setupPhotoAdjust();
     setupTreeGestures();
     initCollapsedFor('all');
 

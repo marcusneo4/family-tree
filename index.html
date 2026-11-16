@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Soon family</title>
-    <meta name="theme-color" content="#EEF1EC">
+    <meta name="theme-color" content="#F2F4EC">
     <meta name="description" content="The Soon family tree: find anyone, see how you are related, and what to call them.">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -55,6 +55,7 @@
             <div class="chips chips-scroll" id="treeChips" role="group" aria-label="Show a branch"></div>
             <div class="tree-stage" id="treeStage" tabindex="0" role="region" aria-label="Family tree. Drag to move, pinch or scroll to zoom. Arrow keys move, plus and minus zoom.">
                 <div class="tree-canvas" id="treeCanvas"></div>
+                <p class="t-from" id="treeFrom" hidden></p>
                 <div class="tree-controls">
                     <button type="button" class="icon-btn icon-btn-solid" id="zoomInBtn" aria-label="Zoom in"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
                     <button type="button" class="icon-btn icon-btn-solid" id="zoomOutBtn" aria-label="Zoom out"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
@@ -91,6 +92,7 @@
     <dialog id="quizDlg" class="sheet" aria-label="Photo quiz"></dialog>
     <dialog id="confirmDlg" class="sheet sheet-small" aria-label="Confirm"></dialog>
 
+    <script src="photos.js"></script>
     <script src="core.js"></script>
     <script src="app.js"></script>
 </body>

@@ -1,24 +1,33 @@
 /* Soon family tree.
-   A family register: rice-paper ground, ink text, jade for actions, and a seal-red 孙 used for one thing only, the Soon bloodline. */
+   A living tree: leaf-tinted paper, ink text, forest green for actions, one colour per branch of the family,
+   gold for the founders, and a seal-red 孙 for the Soon bloodline. */
 
 :root {
-    --paper: #EEF1EC;
-    --paper-2: #E3E8E2;
+    --paper: #F2F4EC;
+    --paper-2: #E6EADF;
     --card: #FFFFFF;
-    --ink: #1C2321;
-    --stone: #55605B;
-    --line: #D5DBD5;
-    --line-strong: #8A958F;
-    --jade: #1F6F54;
-    --jade-text: #1F6F54;
-    --jade-ink: #174F3C;
-    --jade-soft: #D8E8E0;
-    --seal: #B3261E;
+    --ink: #1E2620;
+    --stone: #58615A;
+    --line: #DBE0D4;
+    --line-strong: #8D978F;
+    --jade: #2D6E4E;
+    --jade-text: #2D6E4E;
+    --jade-ink: #1D4D35;
+    --jade-soft: #DCEADF;
+    --seal: #B8322A;
     --seal-ink: #FFF6F0;
-    --danger: #B3261E;
-    --toast-bg: #1C2321;
+    --danger: #B8322A;
+    --gold: #C8952E;
+    --bark: #7A5638;
+    --leaf: #3F7D3A;
+    --ground: #CFDDBE;
+    --sky-top: #DCEBEE;
+    --sky-bottom: #F3F3E6;
+    --b0: #E0612F; --b1: #D99A1F; --b2: #96A52A; --b3: #1F9E78; --b4: #1997A6; --b5: #2D84C8;
+    --b6: #5363C9; --b7: #8656BF; --b8: #B84C97; --b9: #D84A68; --b10: #B56B3B; --b11: #4E9E4A;
+    --toast-bg: #1E2620;
     --toast-fg: #F2F5F1;
-    --toast-accent: #8FE0BE;
+    --toast-accent: #9BE3B6;
     --shadow: 0 10px 30px rgba(20, 30, 26, 0.18);
     --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Noto Serif", "Source Serif 4", Georgia, "Songti SC", "Noto Serif CJK SC", "STSong", "SimSun", serif;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -28,45 +37,19 @@
 }
 
 :root[data-theme="dark"] {
-    --paper: #121715;
-    --paper-2: #0D1210;
-    --card: #1B2320;
-    --ink: #E8EDE9;
-    --stone: #A3AEA8;
-    --line: #2C3732;
-    --line-strong: #6A7770;
-    --jade: #2A8465;
-    --jade-text: #6FCBA6;
-    --jade-ink: #BFEBD9;
-    --jade-soft: #22362E;
-    --seal: #C0392B;
-    --danger: #FF8A80;
-    --toast-bg: #E8EDE9;
-    --toast-fg: #121715;
-    --toast-accent: #1F6F54;
-    --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    --paper: #141A16; --paper-2: #0F1411; --card: #1D2520; --ink: #E8EDE9; --stone: #A5B0A9; --line: #2D3832; --line-strong: #6B7871;
+    --jade: #2F8660; --jade-text: #7BD3A6; --jade-ink: #C4EED8; --jade-soft: #22382D; --seal: #C9443A; --danger: #FF8A80;
+    --bark: #9C7550; --leaf: #5FA25A; --ground: #26341F; --sky-top: #132026; --sky-bottom: #171D17;
+    --toast-bg: #E8EDE9; --toast-fg: #141A16; --toast-accent: #2D6E4E; --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
     :root[data-theme="auto"] {
-        --paper: #121715;
-        --paper-2: #0D1210;
-        --card: #1B2320;
-        --ink: #E8EDE9;
-        --stone: #A3AEA8;
-        --line: #2C3732;
-        --line-strong: #6A7770;
-        --jade: #2A8465;
-        --jade-text: #6FCBA6;
-        --jade-ink: #BFEBD9;
-        --jade-soft: #22362E;
-        --seal: #C0392B;
-        --danger: #FF8A80;
-        --toast-bg: #E8EDE9;
-        --toast-fg: #121715;
-        --toast-accent: #1F6F54;
-        --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        --paper: #141A16; --paper-2: #0F1411; --card: #1D2520; --ink: #E8EDE9; --stone: #A5B0A9; --line: #2D3832; --line-strong: #6B7871;
+        --jade: #2F8660; --jade-text: #7BD3A6; --jade-ink: #C4EED8; --jade-soft: #22382D; --seal: #C9443A; --danger: #FF8A80;
+        --bark: #9C7550; --leaf: #5FA25A; --ground: #26341F; --sky-top: #132026; --sky-bottom: #171D17;
+        --toast-bg: #E8EDE9; --toast-fg: #141A16; --toast-accent: #2D6E4E; --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         color-scheme: dark;
     }
 }
@@ -197,15 +180,20 @@ ul { padding: 0; list-style: none; }
 /* ---------- Avatars ---------- */
 
 .avatar {
-    display: inline-grid; place-items: center; flex: none; overflow: hidden; border-radius: 50%;
-    background: var(--jade-soft); color: var(--jade-ink); font-family: var(--serif); font-weight: 700;
+    position: relative; display: inline-grid; place-items: center; flex: none; overflow: hidden; border-radius: 50%;
+    --ring-c: var(--ring, var(--jade));
+    background: color-mix(in oklab, var(--ring-c) 20%, var(--card)); color: color-mix(in oklab, var(--ring-c) 70%, var(--ink));
+    font-family: var(--serif); font-weight: 700;
+    box-shadow: 0 0 0 2px var(--card), 0 0 0 calc(2px + var(--ring-w, 2.5px)) var(--ring, transparent);
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .avatar-sm { width: 40px; height: 40px; font-size: 15px; }
 .avatar-md { width: 54px; height: 54px; font-size: 19px; }
-.avatar-xl { width: 92px; height: 92px; font-size: 32px; }
-.is-past .avatar { background: var(--paper-2); color: var(--stone); }
-.is-past .avatar img { filter: grayscale(0.75); }
+.avatar-xl { width: 96px; height: 96px; font-size: 32px; --ring-w: 4px; }
+.avatar-adjust { width: 136px; height: 136px; font-size: 42px; --ring-w: 3px; cursor: grab; touch-action: none; }
+.avatar-adjust:active { cursor: grabbing; }
+.is-past .avatar, .avatar.is-past { background: var(--paper-2); color: var(--stone); }
+.is-past .avatar img, .avatar.is-past img { filter: grayscale(0.7); }
 
 /* ---------- Views ---------- */
 
@@ -220,7 +208,13 @@ ul { padding: 0; list-style: none; }
 
 /* Family view */
 
-.focus-card { margin-top: 20px; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 18px; }
+.focus-card {
+    margin-top: 20px; padding: 14px 18px 18px; border-radius: 22px;
+    background: linear-gradient(color-mix(in oklab, var(--c) 16%, var(--card)) 0 66px, var(--card) 66px);
+    border: 1px solid color-mix(in oklab, var(--c) 35%, var(--line));
+    box-shadow: 0 14px 30px -20px color-mix(in oklab, var(--c) 70%, transparent);
+}
+.focus-branch { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font: 600 13px/1.2 var(--sans); color: color-mix(in oklab, var(--c) 75%, var(--ink)); }
 .focus-card:first-child { margin-top: 0; }
 .focus-top { display: flex; align-items: center; gap: 16px; }
 .focus-id { min-width: 0; flex: 1; }
@@ -239,15 +233,19 @@ ul { padding: 0; list-style: none; }
 .focus-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .is-past .focus-name, .is-past.focus-card .focus-name { color: var(--ink); }
 
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
-.tiles-scroll { display: flex; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; }
+.tiles-scroll { display: flex; overflow-x: auto; padding: 4px 2px 8px; scroll-snap-type: x proximity; }
 .tiles-scroll .tile { flex: 0 0 100px; scroll-snap-align: start; }
 .tiles-sm { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
 
 .tile {
-    display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
-    min-height: 44px; padding: 12px 6px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; color: inherit;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+    min-height: 44px; padding: 14px 6px 12px; color: inherit; border-radius: 16px;
+    background: color-mix(in oklab, var(--c, var(--jade)) 8%, var(--card));
+    border: 1px solid color-mix(in oklab, var(--c, var(--jade)) 28%, var(--line));
+    transition: transform 0.12s ease;
 }
+.tile:active, .row:active { transform: scale(0.97); }
 .tile-sm { padding: 8px 4px; gap: 4px; }
 .tile-name { font: 600 14px/1.2 var(--serif); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .tile-sub { font-size: 12px; line-height: 1.25; color: var(--stone); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -299,45 +297,76 @@ ul { padding: 0; list-style: none; }
 
 .view-tree { display: flex; flex-direction: column; height: calc(100dvh - var(--top) - var(--tab)); }
 .view-tree .chips { padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--paper); }
-.tree-stage { position: relative; flex: 1; overflow: hidden; touch-action: none; cursor: grab; background: var(--paper-2); }
+.tree-stage {
+    position: relative; flex: 1; overflow: hidden; touch-action: none; cursor: grab;
+    background: linear-gradient(var(--sky-top), var(--sky-bottom) 70%);
+}
 .tree-stage.is-panning { cursor: grabbing; }
 .tree-stage:focus-visible { outline-offset: -3px; }
-.tree-canvas { position: absolute; left: 0; top: 0; width: max-content; padding: 16px; transform-origin: 0 0; user-select: none; -webkit-user-select: none; }
-.tree-controls { position: absolute; right: 12px; bottom: 12px; display: grid; gap: 8px; }
-.t-from { color: var(--stone); font-size: 14px; margin: 0 0 10px; }
+.tree-canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; user-select: none; -webkit-user-select: none; }
+.tree-controls { position: absolute; right: 12px; bottom: 12px; display: grid; gap: 8px; z-index: 3; }
+.t-from {
+    position: absolute; left: 12px; top: 10px; z-index: 3; padding: 6px 12px; border-radius: 999px;
+    background: var(--card); color: var(--stone); font-size: 13px; box-shadow: 0 2px 10px rgba(20, 30, 26, 0.12);
+}
 
-.t-node { position: relative; display: flex; flex-direction: column; align-items: center; }
-.t-couple { display: flex; gap: 2px; padding: 4px; background: var(--card); border: 1px solid var(--line-strong); border-radius: 14px; }
-.t-card {
-    position: relative; width: 92px; display: flex; flex-direction: column; align-items: center; gap: 4px;
-    padding: 8px 4px; border: 0; border-radius: 10px; background: none; color: inherit; text-align: center;
+.t-svg { position: absolute; left: 0; top: 0; overflow: visible; }
+.t-ground { fill: var(--ground); }
+.t-gen {
+    position: absolute; left: 16px; padding: 4px 12px; border-radius: 999px; white-space: nowrap;
+    background: color-mix(in oklab, var(--card) 80%, transparent); color: var(--stone); font: 600 13px/1.3 var(--serif);
 }
-.t-name { font: 600 13px/1.2 var(--serif); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.t-sub { font-size: 11px; color: var(--stone); line-height: 1.2; }
-.t-card.is-past .t-name { color: var(--stone); }
-.t-card.is-blood::after {
-    content: "孙"; position: absolute; top: 4px; right: 4px; width: 15px; height: 15px; display: grid; place-items: center;
-    background: var(--seal); color: var(--seal-ink); font: 700 10px/1 var(--serif); border-radius: 2px; transform: rotate(-3deg);
-}
-.t-fold {
-    position: relative; z-index: 1; display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 8px; margin-top: 6px;
-    border-radius: 999px; border: 1px solid var(--line-strong); background: var(--card); color: var(--ink); font: 600 12px/1 var(--sans);
-}
-.t-fold .icon { width: 14px; height: 14px; }
-.t-fold.is-folded { background: var(--jade); border-color: var(--jade); color: #fff; }
+.t-gen span { color: var(--ink); margin-right: 4px; }
 
-.t-children { position: relative; display: flex; justify-content: center; padding-top: 14px; }
-.t-children::before { content: ""; position: absolute; top: 0; left: 50%; height: 14px; border-left: 2px solid var(--line-strong); }
-.t-branch { position: relative; padding: 14px 6px 0; }
-.t-branch::before, .t-branch::after { content: ""; position: absolute; top: 0; width: 50%; height: 14px; border-top: 2px solid var(--line-strong); }
-.t-branch::before { right: 50%; }
-.t-branch::after { left: 50%; border-left: 2px solid var(--line-strong); }
-.t-branch:first-child::before, .t-branch:last-child::after { border: 0; }
-.t-branch:last-child::before { border-right: 2px solid var(--line-strong); border-radius: 0 6px 0 0; }
-.t-branch:first-child::after { border-radius: 6px 0 0 0; }
-.t-branch:only-child { padding-top: 14px; }
-.t-branch:only-child::before { display: none; }
-.t-branch:only-child::after { border-top: 0; border-radius: 0; }
+.tn { position: absolute; z-index: 1; display: flex; align-items: flex-start; transform: translate(-50%, -36px); }
+.tn.is-root { transform: translate(-50%, -46px); }
+.tp {
+    position: relative; width: 96px; display: flex; flex-direction: column; align-items: center; gap: 7px;
+    padding: 0; border: 0; background: none; color: inherit; text-align: center;
+}
+.tp .avatar { transition: transform 0.15s ease; }
+.tp:active .avatar { transform: scale(0.94); }
+.avatar-tree { width: 72px; height: 72px; font-size: 24px; --ring-w: 3.5px; }
+.is-root .avatar-tree { width: 92px; height: 92px; font-size: 30px; --ring-w: 4px; }
+.tp-name {
+    max-width: 96px; padding: 3px 9px; border-radius: 10px; background: var(--card);
+    box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--c) 45%, transparent), 0 3px 8px rgba(20, 30, 26, 0.1);
+    font: 600 13px/1.25 var(--serif); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.is-root .tp { width: 116px; }
+.is-root .tp-name { font-size: 15px; max-width: 116px; }
+.tp.is-past .tp-name { color: var(--stone); }
+.tp-seal {
+    position: absolute; top: -2px; right: 6px; width: 20px; height: 20px; display: grid; place-items: center; z-index: 1;
+    background: var(--seal); color: var(--seal-ink); font: 700 12px/1 var(--serif); border-radius: 3px; transform: rotate(-4deg);
+    box-shadow: 0 0 0 2px var(--card);
+}
+.tn-knot {
+    position: absolute; left: 50%; top: 36px; z-index: 2; width: 18px; height: 18px; border-radius: 50%;
+    transform: translate(-50%, -50%); background: var(--card); border: 3.5px solid var(--gold);
+}
+.is-root .tn-knot { top: 46px; width: 22px; height: 22px; }
+.t-bud {
+    position: absolute; z-index: 2; transform: translate(-50%, -50%); min-width: 48px; height: 32px; padding: 0 12px;
+    border-radius: 999px; border: 2.5px solid var(--card); background: var(--c); color: #fff;
+    font: 700 14px/1 var(--sans); box-shadow: 0 4px 12px color-mix(in oklab, var(--c) 45%, transparent);
+}
+.t-knot {
+    position: absolute; z-index: 2; transform: translate(-50%, -50%); width: 28px; height: 28px; display: grid; place-items: center;
+    padding: 0; border-radius: 50%; border: 2px solid var(--c); background: var(--card); color: var(--c);
+}
+.t-knot .icon { width: 14px; height: 14px; stroke-width: 2.4; }
+
+/* The one moment of motion: the tree grows in, generation by generation. */
+.tree-canvas.is-growing .tn, .tree-canvas.is-growing .t-bud { animation: grow-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) backwards; animation-delay: calc(var(--d, 0) * 90ms + 80ms); }
+.tree-canvas.is-growing .t-svg { animation: fade-in 0.5s ease-out backwards; }
+@keyframes grow-in { from { opacity: 0; scale: 0.6; } }
+@keyframes fade-in { from { opacity: 0; } }
+
+.chip-branch { display: inline-flex; align-items: center; gap: 8px; }
+.chip-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.chip-branch.is-active { background: var(--c); border-color: var(--c); color: #fff; }
+.chip-branch.is-active .chip-dot { background: #fff; }
 
 /* ---------- Sheets ---------- */
 
@@ -423,12 +452,17 @@ dialog.sheet-small { margin: auto; width: calc(100% - 32px); max-width: 400px; b
 .seg input:checked + span, .seg button.is-active { background: var(--jade); color: #fff; font-weight: 600; }
 .seg input:focus-visible + span { outline: 3px solid var(--jade-text); outline-offset: -3px; }
 .seg-sm span, .seg-sm button { min-height: 38px; padding: 0 12px; font-size: 14px; }
-.photo-edit { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
+.photo-edit { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; }
+.photo-adjust { display: grid; justify-items: center; gap: 10px; }
+.photo-adjust .hint { margin: 0; }
+.zoom-row { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--stone); }
+.zoom-row input { width: 150px; accent-color: var(--jade); }
 .photo-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .photo-buttons .btn { min-height: 40px; font-size: 14px; padding: 0 12px; }
 .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
 .photo-pick { display: grid; gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); text-align: center; font-size: 12px; }
-.photo-pick img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; }
+.pick-frame { position: relative; display: block; aspect-ratio: 1; overflow: hidden; border-radius: 50%; background: var(--paper-2); }
+.pick-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .photo-pick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Stats, quiz */
@@ -443,7 +477,8 @@ dialog.sheet-small { margin: auto; width: calc(100% - 32px); max-width: 400px; b
 .bar > span { display: block; height: 100%; background: var(--jade); border-radius: 5px; }
 .bar-n { text-align: right; color: var(--stone); }
 
-.quiz-photo img { display: block; width: min(100%, 300px); aspect-ratio: 1; object-fit: cover; border-radius: 20px; margin: 6px auto 16px; background: var(--paper-2); }
+.quiz-photo { position: relative; width: min(100%, 300px); aspect-ratio: 1; overflow: hidden; border-radius: 50%; margin: 6px auto 16px; background: var(--paper-2); box-shadow: 0 0 0 4px var(--card), 0 0 0 8px var(--gold); }
+.quiz-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .quiz-option { min-height: 56px; font-family: var(--serif); font-size: 16px; }
 .quiz-option.is-right { background: var(--jade); border-color: var(--jade); color: #fff; opacity: 1; }
@@ -479,8 +514,8 @@ dialog.sheet-small { margin: auto; width: calc(100% - 32px); max-width: 400px; b
     body.is-printing .view-tree { height: auto; }
     body.is-printing .tree-stage { height: var(--print-h); overflow: visible; background: #fff; }
     body.is-printing .tree-canvas { transform: scale(var(--print-scale)) !important; transform-origin: 0 0; padding: 0; }
-    .t-couple, .t-fold { border-color: #888; }
-    .t-fold { display: none; }
+    .t-knot, .t-bud { display: none !important; }
+    body.is-printing .tree-stage { background: #fff; }
 }
 
 @media (prefers-reduced-motion: reduce) {

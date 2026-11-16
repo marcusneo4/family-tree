@@ -747,7 +747,7 @@ function compareAge(a, b) {
  * Editing (pure data changes; the UI handles undo and saving)
  * ===================================================================== */
 
-const EDITABLE_FIELDS = ['name', 'chineseName', 'nickname', 'callName', 'gender', 'birthday', 'passedOn', 'deathYear', 'relationshipStatus', 'photo', 'bio'];
+const EDITABLE_FIELDS = ['name', 'chineseName', 'nickname', 'callName', 'gender', 'birthday', 'passedOn', 'deathYear', 'relationshipStatus', 'photo', 'photoFocus', 'bio'];
 
 function cleanFields(fields) {
     const out = {};
@@ -756,6 +756,7 @@ function cleanFields(fields) {
         let v = fields[key];
         if (typeof v === 'string') v = v.trim();
         if (key === 'photo') v = sanitizePhotoUrl(v) || null;
+        if (key === 'photoFocus') v = (v && Number.isFinite(+v.x) && Number.isFinite(+v.y)) ? { x: Math.round(+v.x), y: Math.round(+v.y), z: Math.round((+v.z || 1) * 100) / 100 } : null;
         if (key === 'passedOn') v = !!v;
         if (key === 'deathYear') { v = parseInt(v, 10); if (!Number.isFinite(v)) v = null; }
         if (v === '') v = null;

@@ -1,6 +1,6 @@
 /* Offline support: keep the app files and any family photos that have been viewed. */
-const VERSION = 'soon-family-v1';
-const APP_FILES = ['./', 'index.html', 'styles.css', 'core.js', 'app.js', 'icon.svg', 'manifest.webmanifest'];
+const VERSION = 'soon-family-v2';
+const APP_FILES = ['./', 'index.html', 'styles.css', 'photos.js', 'core.js', 'app.js', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', event => {
     event.waitUntil(caches.open(VERSION).then(cache => cache.addAll(APP_FILES)).then(() => self.skipWaiting()));
