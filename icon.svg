@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Soon family">
+  <rect width="512" height="512" fill="#EEF1EC"/>
+  <g transform="rotate(-3 256 256)">
+    <rect x="116" y="116" width="280" height="280" rx="16" fill="#B3261E"/>
+    <rect x="132" y="132" width="248" height="248" rx="8" fill="none" stroke="#FFF6F0" stroke-opacity=".6" stroke-width="6"/>
+    <text x="256" y="322" text-anchor="middle" font-size="190" font-weight="700" fill="#FFF6F0" font-family="'Songti SC','Noto Serif CJK SC','SimSun','Microsoft YaHei',serif">孙</text>
+  </g>
+</svg>

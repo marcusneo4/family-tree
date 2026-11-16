@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Tree – Tests</title>
+    <style>
+        body { font-family: system-ui, sans-serif; padding: 20px; }
+        #testResults { margin-top: 16px; padding: 12px; border-radius: 8px; font-weight: 600; }
+        .test-ok { background: #ecfdf5; color: #065f46; }
+        .test-fail { background: #fef2f2; color: #991b1b; }
+    </style>
+</head>
+<body>
+    <div id="toastContainer"></div>
+    <div id="treeWrapper"><div id="treeContainer"><svg id="connectionLines"></svg><div id="familyTree"></div></div></div>
+
+    <h1>Family Tree unit tests</h1>
+    <p>Open the browser console for details. Results:</p>
+    <div id="testResults">Running…</div>
+
+    <!-- App script (core.js provides escapeHtml, getInitials, isValidFamilyData, etc.) -->
+    <script src="core.js"></script>
+    <script src="tests/family-tree.test.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(function () {
+                if (typeof FamilyTreeTests !== 'undefined') {
+                    FamilyTreeTests.run();
+                } else {
+                    document.getElementById('testResults').textContent = 'Test script failed to load.';
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>

@@ -1,272 +1,97 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soon Family Tree</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Soon family</title>
+    <meta name="theme-color" content="#EEF1EC">
+    <meta name="description" content="The Soon family tree: find anyone, see how you are related, and what to call them.">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <div class="top-controls">
-        <div class="app-title">
-            <img class="title-logo" src="tree.svg" alt="Tree logo">
-            <span class="title-text">Soon Family Tree <span class="title-cn" lang="zh-Hans">孙</span></span>
-        </div>
-        <div class="view-controls">
-            <div class="mode-toggle">
-                <button class="control-btn mode-btn is-active" id="modeDiscreetBtn" data-mode="discreet" title="Discreet mode (photos hidden)">
-                    <i class="fas fa-eye-slash"></i>
-                </button>
-                <button class="control-btn mode-btn" id="modeFilledBtn" data-mode="filled" title="Filled mode (photos shown)">
-                    <i class="fas fa-images"></i>
-                </button>
-                <button class="control-btn mode-btn" id="modeQuizBtn" data-mode="quiz" title="Quiz mode (photos shuffled)">
-                    <i class="fas fa-brain"></i>
-                </button>
-                <button class="control-btn quiz-btn" id="quizCheckBtn" title="Check quiz answers">
-                    <i class="fas fa-check"></i>
-                </button>
-            </div>
-            <button class="control-btn stats-btn" id="statsBtn" title="Statistics">
-                <i class="fas fa-chart-bar"></i>
-                <span>Stats</span>
-            </button>
-            <button class="control-btn stats-btn" id="bloodlineFilterBtn" title="Toggle main bloodline filter">
-                <i class="fas fa-seedling"></i>
-                <span>Bloodline</span>
-            </button>
-            <button class="control-btn" id="refreshPhotosBtn" title="Remove all photos from tree">
-                <i class="fas fa-sync-alt"></i>
-            </button>
-            <div style="position: relative;">
-                <button class="control-btn" id="exportBtn" title="Export">
-                    <i class="fas fa-download"></i>
-                </button>
-                <div class="export-menu" id="exportMenu">
-                    <div class="export-menu-item" id="exportJsonBtn">
-                        <i class="fas fa-file-code"></i>
-                        <span>Export JSON</span>
-                    </div>
-                    <div class="export-menu-item" id="printBtn">
-                        <i class="fas fa-print"></i>
-                        <span>Print Tree</span>
-                    </div>
-                </div>
-            </div>
-            <button class="control-btn" id="zoomOutBtn" title="Zoom Out">
-                <i class="fas fa-search-minus"></i>
-            </button>
-            <button class="control-btn" id="zoomInBtn" title="Zoom In">
-                <i class="fas fa-search-plus"></i>
-            </button>
-            <button class="control-btn dark-mode-toggle" id="darkModeBtn" title="Toggle Dark Mode">
-                <i class="fas fa-moon"></i>
-            </button>
-            <button class="control-btn" id="fullscreenBtn" title="Fullscreen">
-                <i class="fas fa-expand"></i>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="topbar">
+        <div class="brand"><span class="seal seal-lg" aria-hidden="true">孙</span><span class="brand-name">Soon family</span></div>
+        <div class="topbar-actions">
+            <button type="button" class="btn btn-quiet btn-compact" id="photosBtn" aria-pressed="false"></button>
+            <button type="button" class="icon-btn" id="menuBtn" aria-label="Menu" aria-haspopup="dialog">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg>
             </button>
         </div>
-    </div>
+    </header>
 
-    <!-- Toast Container -->
-    <div class="toast-container" id="toastContainer"></div>
+    <main id="main" class="main">
+        <section id="view-family" class="view" aria-label="Family view"></section>
 
-    <!-- Stats Modal -->
-    <div class="stats-modal" id="statsModal">
-        <div class="stats-modal-content">
-            <div class="stats-header">
-                <h2 class="stats-title">Family Statistics</h2>
-                <span class="stats-close" id="statsCloseBtn">&times;</span>
-            </div>
-            <div class="stats-grid" id="statsGrid">
-                <!-- Stats will be generated here -->
-            </div>
-            <div class="stats-section">
-                <h3 class="stats-section-title">
-                    <i class="fas fa-layer-group"></i>
-                    Generation Breakdown
-                </h3>
-                <div class="generation-stats" id="generationStats">
-                    <!-- Generation stats will be generated here -->
+        <section id="view-people" class="view" aria-label="People" hidden>
+            <h1 class="sr-only" data-focus-target>People</h1>
+            <div class="people-controls">
+                <div class="searchbox">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+                    <input id="peopleSearch" type="search" placeholder="Search by name" autocomplete="off" aria-label="Search by name">
+                    <button type="button" class="icon-btn icon-btn-sm" id="peopleClear" aria-label="Clear search" hidden>
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                    </button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="main-content-wrapper">
-        <div class="tree-wrapper" id="treeWrapper">
-            <div class="tree-container" id="treeContainer">
-                <svg class="connection-lines" id="connectionLines"></svg>
-                <div class="tree" id="familyTree">
-                    <!-- Family tree will be generated here -->
-                </div>
-            </div>
-        </div>
-
-        <!-- Profile Sidebar -->
-        <div id="profileSidebar" class="profile-sidebar">
-            <div class="profile-sidebar-content">
-                <div class="profile-header">
-                    <h2 class="profile-title">MEMBER PROFILE</h2>
-                    <span class="profile-close">&times;</span>
-                </div>
-                <div class="profile-body">
-                    <div class="profile-photo-container">
-                        <img id="profilePhoto" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="" class="profile-photo-img" style="display:none">
-                        <div id="profilePhotoPlaceholder" class="profile-photo-placeholder">
-                            <i class="fas fa-user"></i>
-                        </div>
-                    </div>
-                    
-                    <form id="profileEditForm" class="profile-edit-form">
-                        <div class="form-group">
-                            <label for="profileFirstName">First Name:</label>
-                            <input type="text" id="profileFirstName" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="profileLastName">Last Name:</label>
-                            <input type="text" id="profileLastName" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="profileBirthday">Birthday:</label>
-                            <input type="text" id="profileBirthday" placeholder="dd/mm/yyyy" pattern="\d{2}/\d{2}/\d{4}">
-                        </div>
-                        <div class="form-group">
-                            <label for="profileGender">Gender:</label>
-                            <select id="profileGender">
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="profileRelationship">Relationship Status:</label>
-                            <select id="profileRelationship">
-                                <option value="single">Single</option>
-                                <option value="bf_gf">BF/GF</option>
-                                <option value="dating">Dating</option>
-                                <option value="married">Married</option>
-                            </select>
-                        </div>
-                        <div class="form-group inline-checkbox">
-                            <label class="checkbox-label" for="profilePassedOn">
-                                <input type="checkbox" id="profilePassedOn">
-                                <span>Passed on</span>
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label for="profileBiography">Biography:</label>
-                            <textarea id="profileBiography" rows="4" placeholder="No biography added yet."></textarea>
-                        </div>
-                        <div class="profile-form-actions">
-                            <button type="submit" class="btn btn-primary">Save Changes</button>
-                        </div>
-                    </form>
-                    
-                    <div class="profile-actions">
-                        <button class="profile-btn add-child-btn" id="addChildBtn">
-                            <i class="fas fa-baby"></i>
-                            <span>Add Child</span>
-                        </button>
-                        <button class="profile-btn add-spouse-btn" id="addSpouseBtn">
-                            <i class="fas fa-heart"></i>
-                            <span>Add Spouse</span>
-                        </button>
-                    </div>
-                    
-                    <div class="family-members-section">
-                        <div class="family-group">
-                            <div class="family-label">Parents</div>
-                            <div id="profileParents" class="family-list"></div>
-                        </div>
-                        <div class="family-group">
-                            <div class="family-label">Children</div>
-                            <div id="profileChildren" class="family-list"></div>
-                        </div>
-                        <div class="family-group">
-                            <div class="family-label">Grandchildren</div>
-                            <div id="profileGrandchildren" class="family-list"></div>
-                        </div>
+                <div class="chips" id="peopleChips" role="group" aria-label="Filter by group"></div>
+                <div class="people-tools">
+                    <select id="branchSelect" aria-label="Branch"></select>
+                    <div class="seg seg-sm" id="sortToggle" role="group" aria-label="Sort order">
+                        <button type="button" data-sort="tree">Tree order</button>
+                        <button type="button" data-sort="name">A to Z</button>
                     </div>
                 </div>
+                <p class="count-line" id="peopleStatus" role="status" aria-live="polite"></p>
             </div>
-        </div>
-    </div>
+            <ul class="people-list" id="peopleList"></ul>
+        </section>
 
-    <div class="photo-gallery">
-        <div class="gallery-label">PHOTOS</div>
-        <button class="gallery-nav-btn left" id="galleryPrevBtn">
-            <i class="fas fa-chevron-left"></i>
+        <section id="view-tree" class="view view-tree" aria-label="Family tree" hidden>
+            <h1 class="sr-only" data-focus-target>Family tree</h1>
+            <div class="chips chips-scroll" id="treeChips" role="group" aria-label="Show a branch"></div>
+            <div class="tree-stage" id="treeStage" tabindex="0" role="region" aria-label="Family tree. Drag to move, pinch or scroll to zoom. Arrow keys move, plus and minus zoom.">
+                <div class="tree-canvas" id="treeCanvas"></div>
+                <div class="tree-controls">
+                    <button type="button" class="icon-btn icon-btn-solid" id="zoomInBtn" aria-label="Zoom in"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+                    <button type="button" class="icon-btn icon-btn-solid" id="zoomOutBtn" aria-label="Zoom out"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+                    <button type="button" class="icon-btn icon-btn-solid" id="fitBtn" aria-label="Fit to screen"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <nav class="tabbar" aria-label="Views">
+        <button type="button" class="tab" data-view="family">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14.2c2.6.1 4.5 1.8 4.5 4.3"/></svg>
+            <span>Family</span>
         </button>
-        <div class="gallery-container" id="photoGallery">
-            <!-- Photos will be generated here -->
-        </div>
-        <button class="gallery-nav-btn right" id="galleryNextBtn">
-            <i class="fas fa-chevron-right"></i>
+        <button type="button" class="tab" data-view="people">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+            <span>People</span>
         </button>
-    </div>
+        <button type="button" class="tab" data-view="tree">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></svg>
+            <span>Tree</span>
+        </button>
+    </nav>
 
-    <!-- Modal for adding/editing family members -->
-    <div id="memberModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2 id="modalTitle">Add Family Member</h2>
-            <form id="memberForm">
-                <div class="form-group">
-                    <label for="name">Name:</label>
-                    <input type="text" id="name" required>
-                </div>
-                <div class="form-group">
-                    <label for="age">Age:</label>
-                    <input type="number" id="age" min="0" max="150">
-                </div>
-                <div class="form-group">
-                    <label for="gender">Gender:</label>
-                    <select id="gender">
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="relationshipStatus">Relationship Status:</label>
-                    <select id="relationshipStatus">
-                        <option value="single">Single</option>
-                        <option value="bf_gf">BF/GF</option>
-                        <option value="dating">Dating</option>
-                        <option value="married">Married</option>
-                    </select>
-                </div>
-                <div class="form-group inline-checkbox">
-                    <label class="checkbox-label" for="passedOn">
-                        <input type="checkbox" id="passedOn">
-                        <span>Passed on</span>
-                    </label>
-                </div>
-                <div class="form-group">
-                    <label for="photo">Photo URL (optional):</label>
-                    <input type="text" id="photo" placeholder="https://...">
-                </div>
-                <div class="form-group">
-                    <label for="relation">Relation:</label>
-                    <select id="relation">
-                        <option value="parent">Parent</option>
-                        <option value="child">Child</option>
-                        <option value="spouse">Spouse</option>
-                    </select>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Save</button>
-                    <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <div id="toast" class="toast" popover="manual" role="status" aria-live="polite"></div>
+    <input type="file" id="importInput" accept="application/json,.json" hidden>
 
+    <dialog id="profileDlg" class="sheet" aria-label="Profile"></dialog>
+    <dialog id="editDlg" class="sheet" aria-label="Add or edit a person"></dialog>
+    <dialog id="photoDlg" class="sheet" aria-label="Family photos"></dialog>
+    <dialog id="meDlg" class="sheet" aria-label="Who are you"></dialog>
+    <dialog id="menuDlg" class="sheet" aria-label="Menu"></dialog>
+    <dialog id="infoDlg" class="sheet" aria-label="Information"></dialog>
+    <dialog id="quizDlg" class="sheet" aria-label="Photo quiz"></dialog>
+    <dialog id="confirmDlg" class="sheet sheet-small" aria-label="Confirm"></dialog>
 
-    <script src="script.js"></script>
+    <script src="core.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
-
